@@ -119,6 +119,12 @@ public class ObjectInitiator : MonoBehaviour
         return null;
     }
 
+    /// <summary>
+    /// Represents a color with 32 bits per channel (RGBA).
+    /// </summary>
+    /// <param name="image">The image in which the object is detected.</param>
+    /// <param name="contour">The contour of the detected object.</param>
+    /// <returns>The color of the detected object.</returns>
     Color32 GetObjectColor(Mat image, Point[] contour)
     {
         Moments moments = Cv2.Moments(contour);
@@ -129,6 +135,11 @@ public class ObjectInitiator : MonoBehaviour
         return new Color32(color.Item2, color.Item1, color.Item0, 255);
     }
 
+    /// <summary>
+    /// Visualizes the initiated object by instantiating a game object and setting its position and mesh based on the initiated object's properties.
+    /// </summary>
+    /// <param name="initiatedObject">The initiated object to visualize.</param>
+    /// <param name="image">The image used for visualization.</param>
     void VisualizeObject(InitiatedObject initiatedObject, Mat image)
     {
         Debug.Log("Visualizing object:" + initiatedObject.Color + ", " + initiatedObject.Contour.Length);
