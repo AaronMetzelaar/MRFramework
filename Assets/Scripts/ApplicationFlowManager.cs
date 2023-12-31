@@ -61,7 +61,7 @@ public class ApplicationFlowManager : MonoBehaviour
                     objectInitiator.Initialize();
                     objectInitiator.isInitiating = true;
                     canvasPreviewer.enabled = false;
-                    instructionText.text = "Place your object in the center of the canvas.\n" +
+                    instructionText.text = "Place your object in the center of the canvas.\n\n" +
                                            "Press <b>Spacebar</b> to initiate object detection.\n" +
                                            "Press <b>Enter</b> when satisfied.";
                 }

@@ -131,7 +131,7 @@ public class ObjectInitiator : MonoBehaviour
         Vector2 centroidInImageSpace = CalculateCentroidImageSpace(initiatedObject.Contour);
         Vector2 centroidInCanvasSpace = ConvertToCanvasLocalSpace(centroidInImageSpace, image, fullImage.rectTransform);
 
-        // detectedObject.transform.localPosition = (Vector3)centroidInCanvasSpace;
+        detectedObject.transform.localPosition = new Vector3(centroidInCanvasSpace.x, centroidInCanvasSpace.y, -0.01f); // negative z to render in front of the image
 
         if (detectedObject.TryGetComponent(out MeshFilter meshFilter))
             meshFilter.mesh = CreateMeshFromContour(initiatedObject.Contour, centroidInImageSpace, centroidInCanvasSpace);
@@ -148,29 +148,18 @@ public class ObjectInitiator : MonoBehaviour
         // Convert the contour points to vertices and apply the vertical mirroring
         Vector3[] vertices = contour.Select(point => new Vector3(
             point.X - canvasWidth / 2f,
-            -point.Y + canvasHeight / 2f, // Apply vertical mirroring here
-                                          // point.Y,
+            -(point.Y - canvasHeight / 2f), // Apply vertical mirroring here
             0)).ToArray();
 
-        Debug.Log("Canvas heigth: " + canvasHeight + ", canvas width: " + canvasWidth);
+        // Center the vertices around the centroid
+        for (int i = 0; i < vertices.Length; i++)
+        {
+            vertices[i] -= canvasCentroid;
+        }
 
-        // Apply the centroid offset to center the vertices on the canvas
-        // Vector3 centroidOffset = new(
-        //     canvasCentroid.x - imageCentroid.x,
-        //     canvasCentroid.y - imageCentroid.y,
-        //     canvasCentroid.z);
-
-        // for (int i = 0; i < vertices.Length; i++)
-        // {
-        //     vertices[i] += centroidOffset;
-        // }
-
-
-        // Create a new Triangulator instance using the mirrored vertices
         Triangulator triangulator = new(vertices.Select(v => (Vector2)v).ToArray());
         int[] triangles = triangulator.Triangulate();
 
-        // Create the mesh with the mirrored and centered vertices
         Mesh mesh = new()
         {
             vertices = vertices,
@@ -180,7 +169,6 @@ public class ObjectInitiator : MonoBehaviour
 
         return mesh;
     }
-
 
     private Vector2 CalculateCentroidImageSpace(Point[] contour)
     {
@@ -196,5 +184,4 @@ public class ObjectInitiator : MonoBehaviour
             (image.Height - centerInImageSpace.y) / image.Height * canvasSize.y - canvasSize.y / 2f
         );
     }
-
 }
