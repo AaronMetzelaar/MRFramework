@@ -17,13 +17,24 @@ public class Calibrator : MonoBehaviour
     // Used to show the camera feed with the detected rectangle
     public RawImage canvasPreviewImage;
     // The camera texture
-    [NonSerialized]
-    public WebCamTexture webcamTexture;
-    // Boolean to check if the camera is flipped
-    private bool isFlipped = false;
+    [NonSerialized] public WebCamTexture webcamTexture;
     // Public property for the camera rotation
-    [SerializeField]
-    private CameraRotationOption cameraRotation;
+    [SerializeField] private CameraRotationOption cameraRotation;
+
+    [SerializeField] public RawImage fullImage;
+
+    // Boolean to check if the camera is flipped
+    [NonSerialized] private bool isFlipped = false;
+
+    [NonSerialized] public bool isCalibrating = true;
+
+    // Enum for camera rotation options
+    public enum CameraRotationOption
+    {
+        None,
+        FlippedHorizontally,
+    }
+
     public CameraRotationOption CameraRotation
     {
         get
@@ -36,18 +47,7 @@ public class Calibrator : MonoBehaviour
             StartCoroutine(Recalibrate());
         }
     }
-    // Enum for camera rotation options
-    public enum CameraRotationOption
-    {
-        None,
-        FlippedHorizontally,
-    }
 
-    [NonSerialized]
-
-    public bool isCalibrating = true;
-
-    public RawImage fullImage;
 
     /// <summary>
     /// This method is called when the script instance is being loaded.
@@ -241,6 +241,12 @@ public class Calibrator : MonoBehaviour
         return null;
     }
 
+    /// <summary>
+    /// Checks if the contour defined by the given rectangle corners is completely within the image.
+    /// </summary>
+    /// <param name="rectangleCorners">The corners of the rectangle defining the contour.</param>
+    /// <param name="image">The image to check against.</param>
+    /// <returns>True if the contour is within the image, false otherwise.</returns>
     public bool IsContourWithinImage(Point[] rectangleCorners, Mat image)
     {
         OpenCvSharp.Rect boundingRect = Cv2.BoundingRect(rectangleCorners);
@@ -274,6 +280,12 @@ public class Calibrator : MonoBehaviour
         return texture2D;
     }
 
+    /// <summary>
+    /// Rotates the given RawImage based on the specified rotation option.
+    /// </summary>
+    /// <param name="rawImage">The RawImage to rotate.</param>
+    /// <param name="rotation">The rotation option to apply.</param>
+    /// <returns>The rotated RawImage.</returns>
     private RawImage RotateRawImage(RawImage rawImage, CameraRotationOption rotation)
     {
         if (rotation == CameraRotationOption.FlippedHorizontally && !isFlipped)
@@ -312,12 +324,17 @@ public class Calibrator : MonoBehaviour
             new(0, Screen.height),              // Bottom left
         };
 
-        Point2f[] orderedDestinationPoints = OrderCorners(destinationPoints);
         Mat transformationMatrix = Cv2.GetPerspectiveTransform(sourcePoints, destinationPoints);
 
         return transformationMatrix;
     }
 
+    /// <summary>
+    /// Crops the input image based on the provided corners.
+    /// </summary>
+    /// <param name="image">The input image to be cropped.</param>
+    /// <param name="corners">The array of corner points used for perspective transformation.</param>
+    /// <returns>The cropped image.</returns>
     public Mat CropImage(Mat image, Point[] corners)
     {
         Mat transformationMatrix = GetTransformationMatrix(corners);
@@ -359,6 +376,11 @@ public class Calibrator : MonoBehaviour
         return points;
     }
 
+    /// <summary>
+    /// Orders the corners of a shape in a counter-clockwise manner starting from the top left corner.
+    /// </summary>
+    /// <param name="corners">The array of corners to be ordered.</param>
+    /// <returns>An array of corners ordered in a counter-clockwise manner.</returns>
     public Point2f[] OrderCorners(Point2f[] corners)
     {
         Point center = new(corners.Average(point => point.X), corners.Average(point => point.Y));

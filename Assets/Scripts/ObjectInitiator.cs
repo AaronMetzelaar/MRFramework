@@ -8,11 +8,11 @@ public class ObjectInitiator : MonoBehaviour
 {
     private Calibrator calibrator;
     private CalibratorData calibratorData;
-    [NonSerialized]
-    public WebCamTexture webCamTexture;
-    public RawImage fullImage;
+    [NonSerialized] public WebCamTexture webCamTexture;
+    [SerializeField] public RawImage fullImage;
     [SerializeField] private Transform canvasPos;
     [SerializeField] private GameObject prefabMaterialEmpty;
+    [NonSerialized] public bool isInitiating = false;
 
     public class InitiatedObject
     {
@@ -20,9 +20,9 @@ public class ObjectInitiator : MonoBehaviour
         public Point[] Contour;
     }
 
-    [NonSerialized]
-    public bool isInitiating = false;
-
+    /// <summary>
+    /// Initializes the object.
+    /// </summary>
     public void Initialize()
     {
         calibrator = GetComponent<Calibrator>() ?? throw new Exception("Calibrator not found in the scene.");
@@ -34,6 +34,9 @@ public class ObjectInitiator : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// This method is called every frame and checks for user input to initiate object capture and initialization.
+    /// </summary>
     void Update()
     {
         if (!isInitiating)
@@ -46,6 +49,9 @@ public class ObjectInitiator : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Captures an image, initiates an object, and visualizes it.
+    /// </summary>
     public void CaptureAndInitiateObject()
     {
         if (calibrator.CurrentCalibratorData == null)
@@ -75,6 +81,11 @@ public class ObjectInitiator : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Detects an object in the given image.
+    /// </summary>
+    /// <param name="image">The image in which to detect the object.</param>
+    /// <returns>The detected object.</returns>
     InitiatedObject DetectObject(Mat image)
     {
         // Converting to grayscale and applying Gaussian blur to reduce noise
@@ -82,13 +93,11 @@ public class ObjectInitiator : MonoBehaviour
         Cv2.CvtColor(image, grayImage, ColorConversionCodes.BGR2GRAY);
         Cv2.GaussianBlur(grayImage, grayImage, new Size(5, 5), 0);
 
-        // Thresholding to get binary image
         Mat thresholdImage = new();
 
         // Otsu's thresholding can be used here, since we know the background is a uniform color
         Cv2.Threshold(grayImage, thresholdImage, 0, 255, ThresholdTypes.Otsu | ThresholdTypes.BinaryInv);
 
-        // Finding contours
         Point[][] contours;
         HierarchyIndex[] hierarchyIndexes;
         Cv2.FindContours(thresholdImage, out contours, out hierarchyIndexes, RetrievalModes.Tree, ContourApproximationModes.ApproxSimple);
@@ -125,21 +134,26 @@ public class ObjectInitiator : MonoBehaviour
         Debug.Log("Visualizing object:" + initiatedObject.Color + ", " + initiatedObject.Contour.Length);
         GameObject detectedObject = Instantiate(prefabMaterialEmpty, canvasPos);
 
-        Cv2.Polylines(image, new Point[][] { initiatedObject.Contour }, true, new Scalar(0, 255, 0), 2);
-        fullImage.texture = OpenCvSharp.Unity.MatToTexture(image);
-
-        Vector2 centroidInImageSpace = CalculateCentroidImageSpace(initiatedObject.Contour);
-        Vector2 centroidInCanvasSpace = ConvertToCanvasLocalSpace(centroidInImageSpace, image, fullImage.rectTransform);
+        // fullImage.texture = OpenCvSharp.Unity.MatToTexture(image);
+        Vector2 centroidInCanvasSpace = CalculateAndConvertCentroid(initiatedObject.Contour, image, fullImage.rectTransform);
 
         detectedObject.transform.localPosition = new Vector3(centroidInCanvasSpace.x, centroidInCanvasSpace.y, -0.01f); // negative z to render in front of the image
 
         if (detectedObject.TryGetComponent(out MeshFilter meshFilter))
-            meshFilter.mesh = CreateMeshFromContour(initiatedObject.Contour, centroidInImageSpace, centroidInCanvasSpace);
+            meshFilter.mesh = CreateMeshFromContour(initiatedObject.Contour, centroidInCanvasSpace);
         else
             Debug.LogError("Material not found.");
     }
 
-    Mesh CreateMeshFromContour(Point[] contour, Vector2 imageCentroid, Vector3 canvasCentroid)
+    /// <summary>
+    /// Represents a 3D mesh composed of vertices and triangles. Since Unity's coordinate system is
+    /// left-handed with the y-axis pointing up, while OpenCV's coordinate system is left-handed
+    /// with the y-axis pointing down, we need to apply vertical mirroring to the vertices.
+    /// </summary>
+    /// <param name="contour">The contour points.</param>
+    /// <param name="canvasCentroid">The centroid of the contour in canvas space.</param>
+    /// <returns>The created mesh.</returns>
+    Mesh CreateMeshFromContour(Point[] contour, Vector3 canvasCentroid)
     {
         // Get the canvas height from the RectTransform associated with the fullImage RawImage UI element
         float canvasHeight = fullImage.rectTransform.rect.height;
@@ -170,18 +184,32 @@ public class ObjectInitiator : MonoBehaviour
         return mesh;
     }
 
-    private Vector2 CalculateCentroidImageSpace(Point[] contour)
-    {
-        Moments moments = Cv2.Moments(contour);
-        return new Vector2((float)(moments.M10 / moments.M00), (float)(moments.M01 / moments.M00));
-    }
-
-    private Vector2 ConvertToCanvasLocalSpace(Vector2 centerInImageSpace, Mat image, RectTransform canvasRect)
+    /// <summary>
+    /// Calculates the centroid of the given contour in image space and converts it to canvas space.
+    /// </summary>
+    /// <param name="contour">The contour points.</param>
+    /// <param name="image">The image on which the contour is drawn.</param>
+    /// <param name="canvasRect">The RectTransform associated with the fullImage RawImage UI element.</param>
+    Vector2 CalculateAndConvertCentroid(Point[] contour, Mat image, RectTransform canvasRect)
     {
         Vector2 canvasSize = new(canvasRect.rect.width, canvasRect.rect.height);
+
+        Moments moments = Cv2.Moments(contour);
+        Vector2 centerInImageSpace = new((float)(moments.M10 / moments.M00), (float)(moments.M01 / moments.M00));
+
         return new Vector2(
             centerInImageSpace.x / image.Width * canvasSize.x - canvasSize.x / 2f,
             (image.Height - centerInImageSpace.y) / image.Height * canvasSize.y - canvasSize.y / 2f
         );
+    }
+
+    /// <summary>
+    /// Draws a contour on the given image.
+    /// </summary>
+    /// <param name="image">The image on which to draw the contour.</param>
+    /// <param name="contour">The contour to be drawn.</param>
+    private void DrawContour(Mat image, Point[] contour)
+    {
+        Cv2.Polylines(image, new Point[][] { contour }, true, new Scalar(0, 255, 0), 2);
     }
 }

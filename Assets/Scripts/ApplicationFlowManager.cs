@@ -12,17 +12,18 @@ public class ApplicationFlowManager : MonoBehaviour
         Completion
     }
 
-    [NonSerialized]
-    private Calibrator calibrator;
-    private ObjectInitiator objectInitiator;
+    [NonSerialized] private Calibrator calibrator;
+    [NonSerialized] private ObjectInitiator objectInitiator;
     [SerializeField] private TextMeshProUGUI instructionText;
     [SerializeField] private RawImage canvasPreviewer;
     [SerializeField] private RawImage fullImage;
-
-
-
     private AppState currentState = AppState.Calibration;
 
+    /// <summary>
+    /// This method is called when the script instance is being loaded.
+    /// It initializes the calibrator, sets the initial instruction text,
+    /// and checks for the presence of required components.
+    /// </summary>
     void Start()
     {
         calibrator = GetComponent<Calibrator>();
@@ -44,6 +45,9 @@ public class ApplicationFlowManager : MonoBehaviour
                                "Press <b>Enter</b> to continue.";
     }
 
+    /// <summary>
+    /// This method is called once per frame and handles the update logic for the application flow.
+    /// </summary>
     void Update()
     {
         switch (currentState)
