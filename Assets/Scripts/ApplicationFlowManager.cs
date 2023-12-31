@@ -32,8 +32,7 @@ public class ApplicationFlowManager : MonoBehaviour
             Debug.LogError("Calibrator not found in the scene.");
         }
 
-        objectInitiator = GetComponent<ObjectInitiator>();
-        if (objectInitiator == null)
+        if (!TryGetComponent(out objectInitiator))
         {
             Debug.LogError("ObjectInitiator not found in the scene.");
         }

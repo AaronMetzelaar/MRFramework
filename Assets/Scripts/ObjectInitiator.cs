@@ -98,12 +98,9 @@ public class ObjectInitiator : MonoBehaviour
         {
             if (calibrator.IsContourWithinImage(contour, image))
             {
-                // ShapeType shapeType = FindShape(contour);
-
                 return new InitiatedObject
                 {
                     Color = GetObjectColor(image, contour),
-                    // Shape = shapeType,
                     Contour = contour
                 };
             }
@@ -134,7 +131,7 @@ public class ObjectInitiator : MonoBehaviour
         Vector2 centroidInImageSpace = CalculateCentroidImageSpace(initiatedObject.Contour);
         Vector2 centroidInCanvasSpace = ConvertToCanvasLocalSpace(centroidInImageSpace, image, fullImage.rectTransform);
 
-        detectedObject.transform.localPosition = (Vector3)centroidInCanvasSpace;
+        // detectedObject.transform.localPosition = (Vector3)centroidInCanvasSpace;
 
         if (detectedObject.TryGetComponent(out MeshFilter meshFilter))
             meshFilter.mesh = CreateMeshFromContour(initiatedObject.Contour, centroidInImageSpace, centroidInCanvasSpace);
@@ -144,22 +141,46 @@ public class ObjectInitiator : MonoBehaviour
 
     Mesh CreateMeshFromContour(Point[] contour, Vector2 imageCentroid, Vector3 canvasCentroid)
     {
-        Vector3 centroidOffset = new(canvasCentroid.x - imageCentroid.x, canvasCentroid.y - imageCentroid.y, canvasCentroid.z);
-        Vector3[] vertices = contour.Select(point => new Vector3(point.X, point.Y, 0)).ToArray();
-        Vector3[] centeredVertices = vertices.Select(point => new Vector3(point.x, point.y, 0) + centroidOffset).ToArray();
+        // Get the canvas height from the RectTransform associated with the fullImage RawImage UI element
+        float canvasHeight = fullImage.rectTransform.rect.height;
+        float canvasWidth = fullImage.rectTransform.rect.width;
 
-        Triangulator triangulator = new(contour.Select(point => new Vector2(point.X, point.Y)).ToArray());
+        // Convert the contour points to vertices and apply the vertical mirroring
+        Vector3[] vertices = contour.Select(point => new Vector3(
+            point.X - canvasWidth / 2f,
+            -point.Y + canvasHeight / 2f, // Apply vertical mirroring here
+                                          // point.Y,
+            0)).ToArray();
+
+        Debug.Log("Canvas heigth: " + canvasHeight + ", canvas width: " + canvasWidth);
+
+        // Apply the centroid offset to center the vertices on the canvas
+        // Vector3 centroidOffset = new(
+        //     canvasCentroid.x - imageCentroid.x,
+        //     canvasCentroid.y - imageCentroid.y,
+        //     canvasCentroid.z);
+
+        // for (int i = 0; i < vertices.Length; i++)
+        // {
+        //     vertices[i] += centroidOffset;
+        // }
+
+
+        // Create a new Triangulator instance using the mirrored vertices
+        Triangulator triangulator = new(vertices.Select(v => (Vector2)v).ToArray());
         int[] triangles = triangulator.Triangulate();
 
+        // Create the mesh with the mirrored and centered vertices
         Mesh mesh = new()
         {
-            vertices = centeredVertices,
+            vertices = vertices,
             triangles = triangles
         };
         mesh.RecalculateNormals();
 
         return mesh;
     }
+
 
     private Vector2 CalculateCentroidImageSpace(Point[] contour)
     {
@@ -172,7 +193,8 @@ public class ObjectInitiator : MonoBehaviour
         Vector2 canvasSize = new(canvasRect.rect.width, canvasRect.rect.height);
         return new Vector2(
             centerInImageSpace.x / image.Width * canvasSize.x - canvasSize.x / 2f,
-            canvasSize.y / 2f - centerInImageSpace.y / image.Height * canvasSize.y
+            (image.Height - centerInImageSpace.y) / image.Height * canvasSize.y - canvasSize.y / 2f
         );
     }
+
 }
