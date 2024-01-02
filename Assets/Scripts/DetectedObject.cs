@@ -4,12 +4,13 @@ public class DetectedObject : MonoBehaviour
 {
     public InitiatedObject initiatedObject;
     public Vector2 centroidInCanvasSpace;
-    // public Quaternion rotation;
+    public float rotationAngle;
 
-    public DetectedObject(InitiatedObject initiatedObject, Vector2 centroidInCanvasSpace)
+    public DetectedObject(InitiatedObject initiatedObject, Vector2 centroidInCanvasSpace, float rotationAngle)
     {
         this.initiatedObject = initiatedObject;
         this.centroidInCanvasSpace = centroidInCanvasSpace;
+        this.rotationAngle = rotationAngle;
     }
 
     public void UpdatePosition(Vector2 centroidInCanvasSpace)
@@ -17,8 +18,8 @@ public class DetectedObject : MonoBehaviour
         transform.position = centroidInCanvasSpace;
     }
 
-    // public void UpdateRotation(float rotation)
-    // {
-    //     transform.rotation = Quaternion.Euler(0, 0, rotation);
-    // }
+    public void UpdateRotation(float rotation)
+    {
+        transform.rotation = Quaternion.Euler(0, 0, rotation);
+    }
 }

@@ -108,13 +108,16 @@ public class ObjectInitiator : MonoBehaviour
                 Vector2 centroidInCanvasSpace = CalculateAndConvertCentroid(contour, image, fullImage.rectTransform);
                 Point centroidPoint = new((int)centroidInCanvasSpace.x, (int)centroidInCanvasSpace.y);
 
-                VisualizeObject(contour, image, centroidInCanvasSpace);
+                RotatedRect minAreaRect = Cv2.MinAreaRect(contour);
+                float rotationAngle = minAreaRect.Angle;
+
+                VisualizeObject(contour, image, centroidInCanvasSpace, rotationAngle);
 
 
                 return new InitiatedObject
                 {
                     Hue = GetObjectHue(image, contour),
-                    Contour = NormalizeContour(contour, centroidPoint)
+                    Contour = NormalizeContour(contour, centroidPoint, rotationAngle)
                 };
             }
         }
@@ -180,21 +183,26 @@ public class ObjectInitiator : MonoBehaviour
     /// </summary>
     /// <param name="initiatedObject">The initiated object to visualize.</param>
     /// <param name="image">The image used for visualization.</param>
-    void VisualizeObject(Point[] contour, Mat image, Vector2 centroidInCanvasSpace)
+    public GameObject VisualizeObject(Point[] contour, Mat image, Vector2 centroidInCanvasSpace, float rotationAngle)
     {
         GameObject detectedObject = Instantiate(prefabMaterialEmpty, canvasPos);
 
-        image = DrawContour(image, contour);
-        fullImage.texture = OpenCvSharp.Unity.MatToTexture(image);
+        // Uncomment the following lines to draw the contour on the image
+        // image = DrawContour(image, contour);
+        // fullImage.texture = OpenCvSharp.Unity.MatToTexture(image);
 
         detectedObject.transform.localPosition = new Vector3(centroidInCanvasSpace.x, centroidInCanvasSpace.y, -0.01f); // negative z to render in front of the image
+        detectedObject.transform.rotation = Quaternion.Euler(0, 0, rotationAngle);
+
 
         if (detectedObject.TryGetComponent(out MeshFilter meshFilter))
-            meshFilter.mesh = CreateMeshFromContour(contour, centroidInCanvasSpace);
+            meshFilter.mesh = CreateMeshFromContour(contour, centroidInCanvasSpace, rotationAngle);
         else
             Debug.LogError("Material not found.");
 
         detectedObject.GetComponent<MeshRenderer>().material.color = Color.blue;
+
+        return detectedObject;
     }
 
     /// <summary>
@@ -205,10 +213,10 @@ public class ObjectInitiator : MonoBehaviour
     /// <param name="contour">The contour points.</param>
     /// <param name="canvasCentroid">The centroid of the contour in canvas space.</param>
     /// <returns>The created mesh.</returns>
-    public Mesh CreateMeshFromContour(Point[] contour, Vector3 canvasCentroid)
+    public Mesh CreateMeshFromContour(Point[] contour, Vector3 canvasCentroid, float rotationAngle)
     {
         Point canvasCentroidPoint = new((int)canvasCentroid.x, (int)canvasCentroid.y);
-        Point[] normalizedContour = NormalizeContour(contour, canvasCentroidPoint);
+        Point[] normalizedContour = NormalizeContour(contour, canvasCentroidPoint, rotationAngle);
         Vector3[] vertices = normalizedContour.Select(point => new Vector3(point.X, point.Y, 0)).ToArray();
 
         Triangulator triangulator = new(vertices.Select(v => (Vector2)v).ToArray());
@@ -230,7 +238,7 @@ public class ObjectInitiator : MonoBehaviour
     /// <param name="contour">The array of contour points to be normalized.</param>
     /// <param name="canvasCentroid">The centroid point used for centering the normalized contour.</param>
     /// <returns>The normalized contour points.</returns>
-    public Point[] NormalizeContour(Point[] contour, Point canvasCentroid)
+    public Point[] NormalizeContour(Point[] contour, Point canvasCentroid, float rotationAngle)
     {
         float canvasHeight = fullImage.rectTransform.rect.height;
         float canvasWidth = fullImage.rectTransform.rect.width;
@@ -239,7 +247,7 @@ public class ObjectInitiator : MonoBehaviour
         Point[] normalizedContour = contour.Select(point => new Point(
             point.X - canvasWidth / 2f,
             -(point.Y - canvasHeight / 2f) // Apply vertical mirroring here
-            )).ToArray();
+        )).ToArray();
 
         // Center the vertices around the centroid
         for (int i = 0; i < normalizedContour.Length; i++)
@@ -247,7 +255,26 @@ public class ObjectInitiator : MonoBehaviour
             normalizedContour[i] -= canvasCentroid;
         }
 
+        // Apply rotation to the normalized contour
+        for (int i = 0; i < normalizedContour.Length; i++)
+        {
+            Point rotatedPoint = RotatePoint(normalizedContour[i], canvasCentroid, rotationAngle);
+            normalizedContour[i] = rotatedPoint;
+        }
+
         return normalizedContour;
+    }
+
+    private Point RotatePoint(Point point, Point center, float angle)
+    {
+        double radians = angle * Math.PI / 180.0;
+        double cos = Math.Cos(radians);
+        double sin = Math.Sin(radians);
+
+        int rotatedX = (int)(cos * (point.X - center.X) - sin * (point.Y - center.Y) + center.X);
+        int rotatedY = (int)(sin * (point.X - center.X) + cos * (point.Y - center.Y) + center.Y);
+
+        return new Point(rotatedX, rotatedY);
     }
 
     /// <summary>

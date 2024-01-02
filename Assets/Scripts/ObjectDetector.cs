@@ -44,7 +44,7 @@ public class ObjectDetector : MonoBehaviour
             Mat croppedImage = calibrator.CropImage(image, calibratorData.Corners);
 
             DetectedObject[] detectedObjects = FindObjects(croppedImage);
-            ProcessDetectedObjects(detectedObjects);
+            ProcessDetectedObjects(detectedObjects, croppedImage);
         }
     }
 
@@ -71,7 +71,9 @@ public class ObjectDetector : MonoBehaviour
 
             Vector2 centroidInCanvasSpace = objectInitiator.CalculateAndConvertCentroid(contour, image, fullImage.rectTransform);
             Point centroidPoint = new((int)centroidInCanvasSpace.x, (int)centroidInCanvasSpace.y);
-            Point[] normalizedContour = objectInitiator.NormalizeContour(contour, centroidPoint);
+            RotatedRect minAreaRect = Cv2.MinAreaRect(contour);
+            float rotationAngle = minAreaRect.Angle;
+            Point[] normalizedContour = objectInitiator.NormalizeContour(contour, centroidPoint, rotationAngle);
             float hue = objectInitiator.GetObjectHue(image, contour);
 
             foreach (InitiatedObject initiatedObject in initiatedObjects)
@@ -82,6 +84,7 @@ public class ObjectDetector : MonoBehaviour
                     detectedObjects[Array.IndexOf(initiatedObjects, initiatedObject)] = gameObject.AddComponent<DetectedObject>();
                     detectedObjects[Array.IndexOf(initiatedObjects, initiatedObject)].initiatedObject = initiatedObject;
                     detectedObjects[Array.IndexOf(initiatedObjects, initiatedObject)].centroidInCanvasSpace = centroidInCanvasSpace;
+                    detectedObjects[Array.IndexOf(initiatedObjects, initiatedObject)].rotationAngle = rotationAngle;
                 }
             }
         }
@@ -89,7 +92,7 @@ public class ObjectDetector : MonoBehaviour
         return detectedObjects;
     }
 
-    public void ProcessDetectedObjects(DetectedObject[] detectedObjects)
+    public void ProcessDetectedObjects(DetectedObject[] detectedObjects, Mat image)
     {
         foreach (DetectedObject detectedObject in detectedObjects)
         {
@@ -105,12 +108,12 @@ public class ObjectDetector : MonoBehaviour
             }
             else
             {
-                // GameObject gameObject = CreateGameObject(detectedObject);
-                // activeObjects.Add(objectId, gameObject);
+                GameObject gameObject = objectInitiator.VisualizeObject(detectedObject.initiatedObject.Contour, image, detectedObject.centroidInCanvasSpace, detectedObject.rotationAngle);
+                activeObjects.Add(objectId, gameObject);
             }
         }
 
-        // RemoveInactiveObjects();
+        RemoveInactiveObjects();
     }
 
     private int GetObjectId(DetectedObject detectedObject)
@@ -124,6 +127,24 @@ public class ObjectDetector : MonoBehaviour
     private void UpdateGameObject(GameObject gameObject, DetectedObject detectedObject)
     {
         gameObject.GetComponent<DetectedObject>().UpdatePosition(detectedObject.centroidInCanvasSpace);
+        gameObject.GetComponent<DetectedObject>().UpdateRotation(detectedObject.rotationAngle);
+    }
+
+    private void RemoveInactiveObjects()
+    {
+        List<int> inactiveObjectIds = new List<int>();
+        foreach (KeyValuePair<int, GameObject> activeObject in activeObjects)
+        {
+            if (!activeObject.Value.activeSelf)
+            {
+                inactiveObjectIds.Add(activeObject.Key);
+            }
+        }
+
+        foreach (int inactiveObjectId in inactiveObjectIds)
+        {
+            activeObjects.Remove(inactiveObjectId);
+        }
     }
 
     /// <summary>
