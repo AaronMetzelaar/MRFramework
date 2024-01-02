@@ -9,11 +9,12 @@ public class ApplicationFlowManager : MonoBehaviour
     {
         Calibration,
         Initiation,
-        Completion
+        Simulation
     }
 
     [NonSerialized] private Calibrator calibrator;
     [NonSerialized] private ObjectInitiator objectInitiator;
+    [NonSerialized] public ObjectDetector objectDetector;
     [SerializeField] private TextMeshProUGUI instructionText;
     [SerializeField] private RawImage canvasPreviewer;
     [SerializeField] private RawImage fullImage;
@@ -71,21 +72,18 @@ public class ApplicationFlowManager : MonoBehaviour
                 }
                 break;
             case AppState.Initiation:
-                if (Input.GetKeyDown(KeyCode.Space))
-                {
-                    objectInitiator.CaptureAndInitiateObject();
-                }
                 if (Input.GetKeyDown(KeyCode.Return))
                 {
-                    currentState = AppState.Completion;
+                    currentState = AppState.Simulation;
+                    objectInitiator.isInitiating = false;
                     instructionText.text = "Press <b>Spacebar</b> to initiate object detection.";
                 }
                 break;
-            case AppState.Completion:
+            case AppState.Simulation:
                 if (Input.GetKeyDown(KeyCode.Space))
                 {
                     instructionText.text = null;
-
+                    objectDetector.StartDetecting();
                 }
                 break;
         }

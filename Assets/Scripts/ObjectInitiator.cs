@@ -3,7 +3,6 @@ using OpenCvSharp;
 using System.Linq;
 using System;
 using UnityEngine.UI;
-
 public class ObjectInitiator : MonoBehaviour
 {
     private Calibrator calibrator;
@@ -12,20 +11,22 @@ public class ObjectInitiator : MonoBehaviour
     [SerializeField] public RawImage fullImage;
     [SerializeField] private Transform canvasPos;
     [SerializeField] private GameObject prefabMaterialEmpty;
+    [SerializeField] private ObjectData objectData;
     [NonSerialized] public bool isInitiating = false;
 
-    public class InitiatedObject
-    {
-        public Color32 Color;
-        public Point[] Contour;
-    }
+    InitiatedObject initiatedObject = null;
 
     /// <summary>
     /// Initializes the object.
     /// </summary>
     public void Initialize()
     {
-        calibrator = GetComponent<Calibrator>() ?? throw new Exception("Calibrator not found in the scene.");
+
+        if (!TryGetComponent(out calibrator))
+        {
+            Debug.LogError("Calibrator not found.");
+        }
+
         calibratorData = calibrator.CurrentCalibratorData ?? throw new Exception("Calibrator data not found. Please calibrate first.");
 
         if (webCamTexture == null)
@@ -47,6 +48,10 @@ public class ObjectInitiator : MonoBehaviour
         {
             CaptureAndInitiateObject();
         }
+        if (Input.GetKeyDown(KeyCode.S))
+        {
+            SaveObjectToList();
+        }
     }
 
     /// <summary>
@@ -65,17 +70,12 @@ public class ObjectInitiator : MonoBehaviour
         else
             fullImage.texture = null;
 
-
         Mat image = OpenCvSharp.Unity.TextureToMat(webCamTexture);
         Mat croppedImage = calibrator.CropImage(image, calibratorData.Corners);
 
-        InitiatedObject initiatedObject = DetectObject(croppedImage);
+        initiatedObject = DetectObject(croppedImage);
 
-        if (initiatedObject != null)
-        {
-            VisualizeObject(initiatedObject, croppedImage);
-        }
-        else
+        if (initiatedObject == null)
         {
             Debug.LogError("Object not detected.");
         }
@@ -98,19 +98,23 @@ public class ObjectInitiator : MonoBehaviour
         // Otsu's thresholding can be used here, since we know the background is a uniform color
         Cv2.Threshold(grayImage, thresholdImage, 0, 255, ThresholdTypes.Otsu | ThresholdTypes.BinaryInv);
 
-        Point[][] contours;
-        HierarchyIndex[] hierarchyIndexes;
-        Cv2.FindContours(thresholdImage, out contours, out hierarchyIndexes, RetrievalModes.Tree, ContourApproximationModes.ApproxSimple);
+        Cv2.FindContours(thresholdImage, out Point[][] contours, out HierarchyIndex[] hierarchyIndexes, RetrievalModes.Tree, ContourApproximationModes.ApproxSimple);
 
         // Assuming that the biggest contour is the object that is not the entire playing field
         foreach (Point[] contour in contours.OrderByDescending(contour => Cv2.ContourArea(contour)))
         {
             if (calibrator.IsContourWithinImage(contour, image))
             {
+                Vector2 centroidInCanvasSpace = CalculateAndConvertCentroid(contour, image, fullImage.rectTransform);
+                Point centroidPoint = new((int)centroidInCanvasSpace.x, (int)centroidInCanvasSpace.y);
+
+                VisualizeObject(contour, image, centroidInCanvasSpace);
+
+
                 return new InitiatedObject
                 {
-                    Color = GetObjectColor(image, contour),
-                    Contour = contour
+                    Hue = GetObjectHue(image, contour),
+                    Contour = NormalizeContour(contour, centroidPoint)
                 };
             }
         }
@@ -120,19 +124,55 @@ public class ObjectInitiator : MonoBehaviour
     }
 
     /// <summary>
+    /// Saves the initiated object to the object data list.
+    /// </summary>
+    private void SaveObjectToList()
+    {
+        if (initiatedObject != null)
+        {
+            objectData.objectDataList.Add(initiatedObject);
+        }
+        else
+        {
+            Debug.LogError("Object not detected.");
+        }
+    }
+
+    /// <summary>
     /// Represents a color with 32 bits per channel (RGBA).
     /// </summary>
     /// <param name="image">The image in which the object is detected.</param>
     /// <param name="contour">The contour of the detected object.</param>
     /// <returns>The color of the detected object.</returns>
-    Color32 GetObjectColor(Mat image, Point[] contour)
+    public float GetObjectHue(Mat image, Point[] contour)
     {
         Moments moments = Cv2.Moments(contour);
         int centerX = (int)(moments.M10 / moments.M00);
         int centerY = (int)(moments.M01 / moments.M00);
 
-        Vec3b color = image.At<Vec3b>(centerY, centerX);
-        return new Color32(color.Item2, color.Item1, color.Item0, 255);
+        Vec3b color = image.Get<Vec3b>(centerY, centerX);
+        Vector3 colorVector = new(color.Item2, color.Item1, color.Item0);
+        float hue = RgbToHue(colorVector);
+
+        return hue;
+    }
+
+    /// <summary>
+    /// Converts an RGB color value to its corresponding hue value.
+    /// </summary>
+    /// <param name="rgb">The RGB color value to convert.</param>
+    /// <returns>The hue value of the RGB color.</returns>
+    float RgbToHue(Vector3 rgb)
+    {
+        float epsilon = 0.000001f; // Small number to avoid division by zero
+
+        Vector4 p = (rgb.y < rgb.z) ? new Vector4(rgb.z, rgb.y, -1.0f, 2.0f / 3.0f) : new Vector4(rgb.y, rgb.z, 0.0f, -1.0f / 3.0f);
+        Vector4 q = (rgb.x < p.x) ? new Vector4(p.x, p.y, p.w, rgb.x) : new Vector4(rgb.x, p.y, p.z, p.x);
+
+        float c = q.x - Mathf.Min(q.w, q.y);
+        float h = Mathf.Abs((q.w - q.y) / (6 * c + epsilon) + q.z);
+
+        return h;
     }
 
     /// <summary>
@@ -140,20 +180,21 @@ public class ObjectInitiator : MonoBehaviour
     /// </summary>
     /// <param name="initiatedObject">The initiated object to visualize.</param>
     /// <param name="image">The image used for visualization.</param>
-    void VisualizeObject(InitiatedObject initiatedObject, Mat image)
+    void VisualizeObject(Point[] contour, Mat image, Vector2 centroidInCanvasSpace)
     {
-        Debug.Log("Visualizing object:" + initiatedObject.Color + ", " + initiatedObject.Contour.Length);
         GameObject detectedObject = Instantiate(prefabMaterialEmpty, canvasPos);
 
-        // fullImage.texture = OpenCvSharp.Unity.MatToTexture(image);
-        Vector2 centroidInCanvasSpace = CalculateAndConvertCentroid(initiatedObject.Contour, image, fullImage.rectTransform);
+        image = DrawContour(image, contour);
+        fullImage.texture = OpenCvSharp.Unity.MatToTexture(image);
 
         detectedObject.transform.localPosition = new Vector3(centroidInCanvasSpace.x, centroidInCanvasSpace.y, -0.01f); // negative z to render in front of the image
 
         if (detectedObject.TryGetComponent(out MeshFilter meshFilter))
-            meshFilter.mesh = CreateMeshFromContour(initiatedObject.Contour, centroidInCanvasSpace);
+            meshFilter.mesh = CreateMeshFromContour(contour, centroidInCanvasSpace);
         else
             Debug.LogError("Material not found.");
+
+        detectedObject.GetComponent<MeshRenderer>().material.color = Color.blue;
     }
 
     /// <summary>
@@ -164,23 +205,11 @@ public class ObjectInitiator : MonoBehaviour
     /// <param name="contour">The contour points.</param>
     /// <param name="canvasCentroid">The centroid of the contour in canvas space.</param>
     /// <returns>The created mesh.</returns>
-    Mesh CreateMeshFromContour(Point[] contour, Vector3 canvasCentroid)
+    public Mesh CreateMeshFromContour(Point[] contour, Vector3 canvasCentroid)
     {
-        // Get the canvas height from the RectTransform associated with the fullImage RawImage UI element
-        float canvasHeight = fullImage.rectTransform.rect.height;
-        float canvasWidth = fullImage.rectTransform.rect.width;
-
-        // Convert the contour points to vertices and apply the vertical mirroring
-        Vector3[] vertices = contour.Select(point => new Vector3(
-            point.X - canvasWidth / 2f,
-            -(point.Y - canvasHeight / 2f), // Apply vertical mirroring here
-            0)).ToArray();
-
-        // Center the vertices around the centroid
-        for (int i = 0; i < vertices.Length; i++)
-        {
-            vertices[i] -= canvasCentroid;
-        }
+        Point canvasCentroidPoint = new((int)canvasCentroid.x, (int)canvasCentroid.y);
+        Point[] normalizedContour = NormalizeContour(contour, canvasCentroidPoint);
+        Vector3[] vertices = normalizedContour.Select(point => new Vector3(point.X, point.Y, 0)).ToArray();
 
         Triangulator triangulator = new(vertices.Select(v => (Vector2)v).ToArray());
         int[] triangles = triangulator.Triangulate();
@@ -196,12 +225,38 @@ public class ObjectInitiator : MonoBehaviour
     }
 
     /// <summary>
+    /// Normalizes the given contour points by converting them to vertices, applying vertical mirroring, and centering them around the centroid.
+    /// </summary>
+    /// <param name="contour">The array of contour points to be normalized.</param>
+    /// <param name="canvasCentroid">The centroid point used for centering the normalized contour.</param>
+    /// <returns>The normalized contour points.</returns>
+    public Point[] NormalizeContour(Point[] contour, Point canvasCentroid)
+    {
+        float canvasHeight = fullImage.rectTransform.rect.height;
+        float canvasWidth = fullImage.rectTransform.rect.width;
+
+        // Convert the contour points to vertices and apply the vertical mirroring
+        Point[] normalizedContour = contour.Select(point => new Point(
+            point.X - canvasWidth / 2f,
+            -(point.Y - canvasHeight / 2f) // Apply vertical mirroring here
+            )).ToArray();
+
+        // Center the vertices around the centroid
+        for (int i = 0; i < normalizedContour.Length; i++)
+        {
+            normalizedContour[i] -= canvasCentroid;
+        }
+
+        return normalizedContour;
+    }
+
+    /// <summary>
     /// Calculates the centroid of the given contour in image space and converts it to canvas space.
     /// </summary>
     /// <param name="contour">The contour points.</param>
     /// <param name="image">The image on which the contour is drawn.</param>
     /// <param name="canvasRect">The RectTransform associated with the fullImage RawImage UI element.</param>
-    Vector2 CalculateAndConvertCentroid(Point[] contour, Mat image, RectTransform canvasRect)
+    public Vector2 CalculateAndConvertCentroid(Point[] contour, Mat image, RectTransform canvasRect)
     {
         Vector2 canvasSize = new(canvasRect.rect.width, canvasRect.rect.height);
 
@@ -219,8 +274,10 @@ public class ObjectInitiator : MonoBehaviour
     /// </summary>
     /// <param name="image">The image on which to draw the contour.</param>
     /// <param name="contour">The contour to be drawn.</param>
-    private void DrawContour(Mat image, Point[] contour)
+    private Mat DrawContour(Mat image, Point[] contour)
     {
         Cv2.Polylines(image, new Point[][] { contour }, true, new Scalar(0, 255, 0), 2);
+
+        return image;
     }
 }

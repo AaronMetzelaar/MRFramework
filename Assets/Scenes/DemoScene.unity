@@ -435,6 +435,7 @@ GameObject:
   - component: {fileID: 779092894}
   - component: {fileID: 779092893}
   - component: {fileID: 779092892}
+  - component: {fileID: 779092896}
   m_Layer: 0
   m_Name: ApplicationManager
   m_TagString: Untagged
@@ -457,6 +458,7 @@ MonoBehaviour:
   fullImage: {fileID: 668560654}
   canvasPos: {fileID: 1416648223}
   prefabMaterialEmpty: {fileID: 3295479666438238312, guid: 5a3d775d47b1a6d418628554b1a5fef2, type: 3}
+  objectData: {fileID: 11400000, guid: decb7499f3955e949848fcf22ed12580, type: 2}
 --- !u!114 &779092893
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -502,6 +504,20 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &779092896
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 779092891}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 55b9908bc20e4d74aa4ca2c41e838a50, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  fullImage: {fileID: 668560654}
+  objectMatchThreshold: 0.9
 --- !u!1 &950920451
 GameObject:
   m_ObjectHideFlags: 0
