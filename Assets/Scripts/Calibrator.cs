@@ -62,22 +62,6 @@ public class Calibrator : MonoBehaviour
     }
 
     /// <summary>
-    /// This method is called every frame and checks if the space key is pressed.
-    /// If the space key is pressed, it starts the coroutine for recalibration.
-    /// </summary>
-    private void Update()
-    {
-        if (!isCalibrating)
-        {
-            return;
-        }
-        if (Input.GetKeyDown(KeyCode.Space))
-        {
-            StartCoroutine(Recalibrate());
-        }
-    }
-
-    /// <summary>
     /// Represents a coroutine that delays the initial detection for a specified amount of time.
     /// </summary>
     /// <returns>An IEnumerator object.</returns>

@@ -517,6 +517,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   fullImage: {fileID: 668560654}
+  objectData: {fileID: 11400000, guid: decb7499f3955e949848fcf22ed12580, type: 2}
   objectMatchThreshold: 0.9
 --- !u!1 &950920451
 GameObject:

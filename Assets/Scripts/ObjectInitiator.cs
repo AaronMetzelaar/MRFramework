@@ -3,16 +3,18 @@ using OpenCvSharp;
 using System.Linq;
 using System;
 using UnityEngine.UI;
+using System.Collections.Generic;
+using System.Collections;
 public class ObjectInitiator : MonoBehaviour
 {
     private Calibrator calibrator;
     private CalibratorData calibratorData;
     [NonSerialized] public WebCamTexture webCamTexture;
+    [NonSerialized] public GameObject currentVisualizedObject;
     [SerializeField] public RawImage fullImage;
     [SerializeField] private Transform canvasPos;
     [SerializeField] private GameObject prefabMaterialEmpty;
     [SerializeField] private ObjectData objectData;
-    [NonSerialized] public bool isInitiating = false;
 
     InitiatedObject initiatedObject = null;
 
@@ -35,23 +37,16 @@ public class ObjectInitiator : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// This method is called every frame and checks for user input to initiate object capture and initialization.
-    /// </summary>
-    void Update()
+    public IEnumerator Reinitiate()
     {
-        if (!isInitiating)
+        if (currentVisualizedObject != null)
         {
-            return;
+            Destroy(currentVisualizedObject);
         }
-        if (Input.GetKeyDown(KeyCode.Space))
-        {
-            CaptureAndInitiateObject();
-        }
-        if (Input.GetKeyDown(KeyCode.S))
-        {
-            SaveObjectToList();
-        }
+        initiatedObject = null;
+        fullImage.texture = null;
+        yield return new WaitForSeconds(0.2f);
+        CaptureAndInitiateObject();
     }
 
     /// <summary>
@@ -67,8 +62,6 @@ public class ObjectInitiator : MonoBehaviour
 
         if
             (fullImage.gameObject.activeSelf == false) fullImage.gameObject.SetActive(true);
-        else
-            fullImage.texture = null;
 
         Mat image = OpenCvSharp.Unity.TextureToMat(webCamTexture);
         Mat croppedImage = calibrator.CropImage(image, calibratorData.Corners);
@@ -98,27 +91,23 @@ public class ObjectInitiator : MonoBehaviour
         // Otsu's thresholding can be used here, since we know the background is a uniform color
         Cv2.Threshold(grayImage, thresholdImage, 0, 255, ThresholdTypes.Otsu | ThresholdTypes.BinaryInv);
 
-        Cv2.FindContours(thresholdImage, out Point[][] contours, out HierarchyIndex[] hierarchyIndexes, RetrievalModes.Tree, ContourApproximationModes.ApproxSimple);
+        // If Otsu's thresholding fails, we can use adaptive thresholding instead
 
-        // Assuming that the biggest contour is the object that is not the entire playing field
-        foreach (Point[] contour in contours.OrderByDescending(contour => Cv2.ContourArea(contour)))
+        InitiatedObject initiatedObjectOtsu = FindContour(thresholdImage, image);
+
+        if (initiatedObjectOtsu != null)
         {
-            if (calibrator.IsContourWithinImage(contour, image))
+            return initiatedObjectOtsu;
+        }
+        else
+        {
+            Cv2.AdaptiveThreshold(grayImage, thresholdImage, 255, AdaptiveThresholdTypes.GaussianC, ThresholdTypes.BinaryInv, 11, 2);
+            InitiatedObject initiatedObjectAdaptive = FindContour(thresholdImage, image);
+            // fullImage.texture = OpenCvSharp.Unity.MatToTexture(thresholdImage);
+
+            if (initiatedObjectAdaptive != null)
             {
-                Vector2 centroidInCanvasSpace = CalculateAndConvertCentroid(contour, image, fullImage.rectTransform);
-                Point centroidPoint = new((int)centroidInCanvasSpace.x, (int)centroidInCanvasSpace.y);
-
-                RotatedRect minAreaRect = Cv2.MinAreaRect(contour);
-                float rotationAngle = minAreaRect.Angle;
-
-                VisualizeObject(contour, image, centroidInCanvasSpace, rotationAngle);
-
-
-                return new InitiatedObject
-                {
-                    Hue = GetObjectHue(image, contour),
-                    Contour = NormalizeContour(contour, centroidPoint, rotationAngle)
-                };
+                return initiatedObjectAdaptive;
             }
         }
 
@@ -129,16 +118,47 @@ public class ObjectInitiator : MonoBehaviour
     /// <summary>
     /// Saves the initiated object to the object data list.
     /// </summary>
-    private void SaveObjectToList()
+    public void SaveObjectToList()
     {
         if (initiatedObject != null)
         {
+            objectData.objectDataList ??= new List<InitiatedObject>();
             objectData.objectDataList.Add(initiatedObject);
         }
         else
         {
             Debug.LogError("Object not detected.");
         }
+    }
+
+    public InitiatedObject FindContour(Mat thresholdImage, Mat image)
+    {
+        Cv2.FindContours(thresholdImage, out Point[][] contours, out HierarchyIndex[] hierarchyIndexes, RetrievalModes.Tree, ContourApproximationModes.ApproxSimple);
+        double canvasArea = fullImage.rectTransform.rect.width * fullImage.rectTransform.rect.height;
+        double maxArea = canvasArea * 0.5;
+        double minArea = canvasArea * 0.01;
+        // Assuming that the biggest contour is the object that is not the entire playing field
+        foreach (Point[] contour in contours.OrderByDescending(contour => Cv2.ContourArea(contour)))
+        {
+            if (calibrator.IsContourWithinImage(contour, image) && maxArea > Cv2.ContourArea(contour) && Cv2.ContourArea(contour) > minArea)
+            {
+                Vector2 centroidInCanvasSpace = CalculateAndConvertCentroid(contour, image, fullImage.rectTransform);
+                Point centroidPoint = new((int)centroidInCanvasSpace.x, (int)centroidInCanvasSpace.y);
+
+                RotatedRect minAreaRect = Cv2.MinAreaRect(contour);
+                float rotationAngle = minAreaRect.Angle;
+
+                VisualizeObject(contour, image, centroidInCanvasSpace, rotationAngle);
+
+                return new InitiatedObject
+                {
+                    Hue = GetObjectHue(image, contour),
+                    Contour = NormalizeContour(contour, centroidPoint, rotationAngle)
+                };
+            }
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -185,22 +205,21 @@ public class ObjectInitiator : MonoBehaviour
     /// <param name="image">The image used for visualization.</param>
     public GameObject VisualizeObject(Point[] contour, Mat image, Vector2 centroidInCanvasSpace, float rotationAngle)
     {
-        GameObject detectedObject = Instantiate(prefabMaterialEmpty, canvasPos);
-
         // Uncomment the following lines to draw the contour on the image
         // image = DrawContour(image, contour);
         // fullImage.texture = OpenCvSharp.Unity.MatToTexture(image);
-
-        detectedObject.transform.localPosition = new Vector3(centroidInCanvasSpace.x, centroidInCanvasSpace.y, -0.01f); // negative z to render in front of the image
-        detectedObject.transform.rotation = Quaternion.Euler(0, 0, rotationAngle);
-
+        GameObject detectedObject = Instantiate(prefabMaterialEmpty, canvasPos);
 
         if (detectedObject.TryGetComponent(out MeshFilter meshFilter))
             meshFilter.mesh = CreateMeshFromContour(contour, centroidInCanvasSpace, rotationAngle);
         else
             Debug.LogError("Material not found.");
 
+        detectedObject.transform.localPosition = new Vector3(centroidInCanvasSpace.x, centroidInCanvasSpace.y, -0.01f); // negative z to render in front of the image
+        detectedObject.transform.rotation = Quaternion.Euler(0, 0, rotationAngle);
         detectedObject.GetComponent<MeshRenderer>().material.color = Color.blue;
+
+        currentVisualizedObject = detectedObject;
 
         return detectedObject;
     }
@@ -249,17 +268,18 @@ public class ObjectInitiator : MonoBehaviour
             -(point.Y - canvasHeight / 2f) // Apply vertical mirroring here
         )).ToArray();
 
-        // Center the vertices around the centroid
-        for (int i = 0; i < normalizedContour.Length; i++)
-        {
-            normalizedContour[i] -= canvasCentroid;
-        }
 
         // Apply rotation to the normalized contour
         for (int i = 0; i < normalizedContour.Length; i++)
         {
-            Point rotatedPoint = RotatePoint(normalizedContour[i], canvasCentroid, rotationAngle);
+            Point rotatedPoint = RotatePoint(normalizedContour[i], canvasCentroid, -rotationAngle); // negative angle to normalize the rotation 
             normalizedContour[i] = rotatedPoint;
+        }
+
+        // Center the vertices around the centroid
+        for (int i = 0; i < normalizedContour.Length; i++)
+        {
+            normalizedContour[i] -= canvasCentroid;
         }
 
         return normalizedContour;

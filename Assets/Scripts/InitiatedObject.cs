@@ -1,7 +1,8 @@
+using System;
 using OpenCvSharp;
-using UnityEngine;
 
-public class InitiatedObject : MonoBehaviour
+[Serializable]
+public class InitiatedObject
 {
     public float Hue;
     public Point[] Contour;

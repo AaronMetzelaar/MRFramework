@@ -32,7 +32,7 @@ public class ObjectDetector : MonoBehaviour
         activeObjects = new Dictionary<int, GameObject>();
 
         // Start invoking the UpdateObjects method every second
-        InvokeRepeating(nameof(UpdateObjects), 1f, 1f);
+        InvokeRepeating(nameof(UpdateObjects), 0.1f, 0.1f);
 
     }
 

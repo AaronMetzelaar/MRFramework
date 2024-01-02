@@ -15,10 +15,12 @@ public class ApplicationFlowManager : MonoBehaviour
     [NonSerialized] private Calibrator calibrator;
     [NonSerialized] private ObjectInitiator objectInitiator;
     [NonSerialized] public ObjectDetector objectDetector;
+    [SerializeField] private ObjectData objectData;
     [SerializeField] private TextMeshProUGUI instructionText;
     [SerializeField] private RawImage canvasPreviewer;
     [SerializeField] private RawImage fullImage;
     private AppState currentState = AppState.Calibration;
+    private bool firstInitiation = true;
 
     /// <summary>
     /// This method is called when the script instance is being loaded.
@@ -64,7 +66,6 @@ public class ApplicationFlowManager : MonoBehaviour
                     calibrator.isCalibrating = false;
                     objectInitiator.webCamTexture = calibrator.webcamTexture;
                     objectInitiator.Initialize();
-                    objectInitiator.isInitiating = true;
                     canvasPreviewer.enabled = false;
                     instructionText.text = "Place your object in the center of the canvas.\n\n" +
                                            "Press <b>Spacebar</b> to initiate object detection.\n" +
@@ -72,10 +73,24 @@ public class ApplicationFlowManager : MonoBehaviour
                 }
                 break;
             case AppState.Initiation:
+                if (Input.GetKeyDown(KeyCode.Space))
+                {
+                    if (firstInitiation)
+                    {
+                        firstInitiation = false;
+                        objectInitiator.CaptureAndInitiateObject();
+                    }
+                    else
+                    {
+                        StartCoroutine(objectInitiator.Reinitiate());
+                    }
+                }
                 if (Input.GetKeyDown(KeyCode.Return))
                 {
+                    objectInitiator.SaveObjectToList();
+                    Destroy(objectInitiator.currentVisualizedObject);
+                    fullImage.texture = null;
                     currentState = AppState.Simulation;
-                    objectInitiator.isInitiating = false;
                     instructionText.text = "Press <b>Spacebar</b> to initiate object detection.";
                 }
                 break;
@@ -87,5 +102,13 @@ public class ApplicationFlowManager : MonoBehaviour
                 }
                 break;
         }
+    }
+
+    void OnApplicationQuit()
+    {
+        // Comment this line if you want to keep the object data between sessions.
+        // Not recommended over longer periods of time, as the object data might
+        // become outdated.
+        objectData.ClearData();
     }
 }
