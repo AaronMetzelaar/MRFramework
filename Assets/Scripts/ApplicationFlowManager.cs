@@ -40,6 +40,11 @@ public class ApplicationFlowManager : MonoBehaviour
         {
             Debug.LogError("ObjectInitiator not found in the scene.");
         }
+
+        if (!TryGetComponent(out objectDetector))
+        {
+            Debug.LogError("ObjectDetector not found in the scene.");
+        }
         // Set initial instruction text
         instructionText.text = "If the border is incorrect, make sure the entire playing field is visible.\n" +
                                "Also, make sure there is enough contrast between the playing field\n" +
@@ -78,11 +83,11 @@ public class ApplicationFlowManager : MonoBehaviour
                     if (firstInitiation)
                     {
                         firstInitiation = false;
-                        objectInitiator.CaptureAndInitiateObject();
+                        StartCoroutine(objectInitiator.DelayedInitiate());
                     }
                     else
                     {
-                        StartCoroutine(objectInitiator.Reinitiate());
+                        objectInitiator.Reinitiate();
                     }
                 }
                 if (Input.GetKeyDown(KeyCode.Return))

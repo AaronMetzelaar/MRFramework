@@ -4,6 +4,7 @@ using UnityEngine.UI;
 using System.Linq;
 using System.Collections;
 using System;
+using TMPro;
 
 
 /// <summary>
@@ -22,6 +23,7 @@ public class Calibrator : MonoBehaviour
     [SerializeField] private CameraRotationOption cameraRotation;
 
     [SerializeField] public RawImage fullImage;
+    [SerializeField] public TextMeshProUGUI instructionText;
 
     // Boolean to check if the camera is flipped
     [NonSerialized] private bool isFlipped = false;
@@ -67,8 +69,10 @@ public class Calibrator : MonoBehaviour
     /// <returns>An IEnumerator object.</returns>
     private IEnumerator DelayedInitialDetection()
     {
+        instructionText.gameObject.SetActive(false);
         yield return new WaitForSeconds(3.0f);
         RunDetection();
+        instructionText.gameObject.SetActive(true);
     }
 
     /// <summary>
@@ -76,6 +80,8 @@ public class Calibrator : MonoBehaviour
     /// </summary>
     private void RunDetection()
     {
+        // Debug the camera size
+        Debug.Log("Camera size: " + webcamTexture.width + "x" + webcamTexture.height);
         if (webcamTexture != null && webcamTexture.isPlaying)
         {
             Point[] corners = DetectCorners(webcamTexture);
@@ -98,11 +104,15 @@ public class Calibrator : MonoBehaviour
 
             // Draw the rectangle on the screen
             Mat image = OpenCvSharp.Unity.TextureToMat(TextureToTexture2D(webcamTexture));
+            Mat croppedImage = CropImage(image, corners);
+            CurrentCalibratorData = new CalibratorData(corners, transformationMatrix, croppedImage, cameraRotation);
+
+
             Cv2.Polylines(image, new[] { gameCorners }, true, Scalar.Green, 5);
 
             // Rotate the webcam texture
             canvasPreviewImage = RotateRawImage(canvasPreviewImage, cameraRotation);
-            CurrentCalibratorData = new CalibratorData(corners, transformationMatrix);
+
 
             // To show only the detected rectangle, crop the image to the rectangle
             // Mat transformedImage = new Mat();
@@ -125,9 +135,12 @@ public class Calibrator : MonoBehaviour
             canvasPreviewImage.texture = Texture2D.whiteTexture;
         }
 
+        instructionText.gameObject.SetActive(false);
         // Give the camera some time to take a picture
         yield return new WaitForSeconds(0.2f);
         RunDetection();
+        instructionText.gameObject.SetActive(true);
+
     }
 
     /// <summary>
@@ -270,7 +283,7 @@ public class Calibrator : MonoBehaviour
     /// <param name="rawImage">The RawImage to rotate.</param>
     /// <param name="rotation">The rotation option to apply.</param>
     /// <returns>The rotated RawImage.</returns>
-    private RawImage RotateRawImage(RawImage rawImage, CameraRotationOption rotation)
+    public RawImage RotateRawImage(RawImage rawImage, CameraRotationOption rotation)
     {
         if (rotation == CameraRotationOption.FlippedHorizontally && !isFlipped)
         {

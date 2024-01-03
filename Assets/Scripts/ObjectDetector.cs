@@ -22,18 +22,16 @@ public class ObjectDetector : MonoBehaviour
     private Dictionary<int, GameObject> activeObjects;
     private int objectIdCount = 0;
 
-    public void Start()
+    public void Initialize()
     {
         if (!TryGetComponent(out objectInitiator))
         {
             Debug.LogError("ObjectInitiator not found in the scene.");
         }
-        initiatedObjects = objectData.objectDataList.ToArray();
-        activeObjects = new Dictionary<int, GameObject>();
-
-        // Start invoking the UpdateObjects method every second
-        InvokeRepeating(nameof(UpdateObjects), 0.1f, 0.1f);
-
+        if (webCamTexture == null)
+        {
+            Debug.LogError("Webcam texture not found.");
+        }
     }
 
     private void UpdateObjects()
@@ -51,6 +49,10 @@ public class ObjectDetector : MonoBehaviour
     public void StartDetecting()
     {
         isDetecting = !isDetecting;
+        initiatedObjects = objectData.objectDataList.ToArray();
+        activeObjects = new Dictionary<int, GameObject>();
+
+        InvokeRepeating(nameof(UpdateObjects), 0.1f, 0.1f);
     }
 
     // Image should already be cropped, thresholded etc before calling this method

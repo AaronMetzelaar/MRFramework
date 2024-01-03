@@ -5,6 +5,7 @@ using System;
 using UnityEngine.UI;
 using System.Collections.Generic;
 using System.Collections;
+using TMPro;
 public class ObjectInitiator : MonoBehaviour
 {
     private Calibrator calibrator;
@@ -15,8 +16,14 @@ public class ObjectInitiator : MonoBehaviour
     [SerializeField] private Transform canvasPos;
     [SerializeField] private GameObject prefabMaterialEmpty;
     [SerializeField] private ObjectData objectData;
+    [SerializeField] private TextMeshProUGUI instructionText;
 
     InitiatedObject initiatedObject = null;
+    Mat differenceImage;
+    Mat grayImage;
+    Mat bilateralFilterImage;
+    Mat cannyImage;
+    Mat kernel;
 
     /// <summary>
     /// Initializes the object.
@@ -37,16 +44,35 @@ public class ObjectInitiator : MonoBehaviour
         }
     }
 
-    public IEnumerator Reinitiate()
+    public IEnumerator DelayedInitiate()
+    {
+        instructionText.gameObject.SetActive(false);
+        yield return new WaitForSeconds(0.2f);
+        CaptureAndInitiateObject();
+        yield return new WaitForSeconds(0.2f);
+        instructionText.gameObject.SetActive(true);
+    }
+
+    public void Reinitiate()
     {
         if (currentVisualizedObject != null)
         {
             Destroy(currentVisualizedObject);
         }
-        initiatedObject = null;
+        if (initiatedObject != null)
+        {
+            initiatedObject.Contour = null;
+            initiatedObject.Hue = 0f;
+        }
+
         fullImage.texture = null;
-        yield return new WaitForSeconds(0.2f);
-        CaptureAndInitiateObject();
+        differenceImage?.Dispose();
+        grayImage?.Dispose();
+        bilateralFilterImage?.Dispose();
+        cannyImage?.Dispose();
+        kernel?.Dispose();
+
+        StartCoroutine(DelayedInitiate());
     }
 
     /// <summary>
@@ -72,6 +98,7 @@ public class ObjectInitiator : MonoBehaviour
         {
             Debug.LogError("Object not detected.");
         }
+
     }
 
     /// <summary>
@@ -81,40 +108,33 @@ public class ObjectInitiator : MonoBehaviour
     /// <returns>The detected object.</returns>
     InitiatedObject DetectObject(Mat image)
     {
-        // Converting to grayscale and applying Gaussian blur to reduce noise
-        Mat grayImage = new();
-        Cv2.CvtColor(image, grayImage, ColorConversionCodes.BGR2GRAY);
-        Cv2.GaussianBlur(grayImage, grayImage, new Size(5, 5), 0);
+        differenceImage = SubtractImages(calibratorData.CalibratedImage, image);
 
-        Mat thresholdImage = new();
+        grayImage = new Mat();
+        Cv2.CvtColor(differenceImage, grayImage, ColorConversionCodes.BGR2GRAY);
 
-        // Otsu's thresholding can be used here, since we know the background is a uniform color
-        Cv2.Threshold(grayImage, thresholdImage, 0, 255, ThresholdTypes.Otsu | ThresholdTypes.BinaryInv);
+        // Apply bilateral filter to reduce noise while keeping edges sharp
+        bilateralFilterImage = new Mat();
+        Cv2.BilateralFilter(grayImage, bilateralFilterImage, 9, 50, 50);
 
-        // If Otsu's thresholding fails, we can use adaptive thresholding instead
+        // Use Canny edge detection as a thresholding step
+        cannyImage = new Mat();
+        Cv2.Canny(bilateralFilterImage, cannyImage, 1, 75);
 
-        InitiatedObject initiatedObjectOtsu = FindContour(thresholdImage, image);
+        kernel = Cv2.GetStructuringElement(MorphShapes.Rect, new Size(3, 3));
+        Cv2.MorphologyEx(cannyImage, cannyImage, MorphTypes.Close, kernel);
 
-        if (initiatedObjectOtsu != null)
+        // Find the largest contour that represents the object
+        InitiatedObject initiatedObject = FindContour(cannyImage, image);
+
+        if (initiatedObject != null)
         {
-            return initiatedObjectOtsu;
-        }
-        else
-        {
-            Cv2.AdaptiveThreshold(grayImage, thresholdImage, 255, AdaptiveThresholdTypes.GaussianC, ThresholdTypes.BinaryInv, 11, 2);
-            InitiatedObject initiatedObjectAdaptive = FindContour(thresholdImage, image);
-            // fullImage.texture = OpenCvSharp.Unity.MatToTexture(thresholdImage);
-
-            if (initiatedObjectAdaptive != null)
-            {
-                return initiatedObjectAdaptive;
-            }
+            return initiatedObject;
         }
 
         Debug.LogError("Object not detected.");
         return null;
     }
-
     /// <summary>
     /// Saves the initiated object to the object data list.
     /// </summary>
@@ -131,35 +151,55 @@ public class ObjectInitiator : MonoBehaviour
         }
     }
 
+    public Mat SubtractImages(Mat image1, Mat image2)
+    {
+        Mat result = new();
+        Cv2.Absdiff(image1, image2, result);
+        return result;
+    }
+
     public InitiatedObject FindContour(Mat thresholdImage, Mat image)
     {
-        Cv2.FindContours(thresholdImage, out Point[][] contours, out HierarchyIndex[] hierarchyIndexes, RetrievalModes.Tree, ContourApproximationModes.ApproxSimple);
+        Cv2.FindContours(thresholdImage, out Point[][] contours, out _, RetrievalModes.External, ContourApproximationModes.ApproxSimple);
+
+        if (contours.Length == 0)
+            return null;
+
+        // Find the largest contour by area
+        Point[] largestContour = contours.OrderByDescending(c => Cv2.ContourArea(c)).First();
+
+        if (!calibrator.IsContourWithinImage(largestContour, image))
+            largestContour = contours.OrderByDescending(c => Cv2.ContourArea(c)).Skip(1).First();
+
+        double area = Cv2.ContourArea(largestContour);
         double canvasArea = fullImage.rectTransform.rect.width * fullImage.rectTransform.rect.height;
         double maxArea = canvasArea * 0.5;
         double minArea = canvasArea * 0.01;
-        // Assuming that the biggest contour is the object that is not the entire playing field
-        foreach (Point[] contour in contours.OrderByDescending(contour => Cv2.ContourArea(contour)))
+
+        if (area < minArea || area > maxArea)
+            return null;
+
+        // If the contour consists of multiple contours, merge them into one using the convex hull algorithm
+        if (largestContour.Length > 1)
         {
-            if (calibrator.IsContourWithinImage(contour, image) && maxArea > Cv2.ContourArea(contour) && Cv2.ContourArea(contour) > minArea)
-            {
-                Vector2 centroidInCanvasSpace = CalculateAndConvertCentroid(contour, image, fullImage.rectTransform);
-                Point centroidPoint = new((int)centroidInCanvasSpace.x, (int)centroidInCanvasSpace.y);
-
-                RotatedRect minAreaRect = Cv2.MinAreaRect(contour);
-                float rotationAngle = minAreaRect.Angle;
-
-                VisualizeObject(contour, image, centroidInCanvasSpace, rotationAngle);
-
-                return new InitiatedObject
-                {
-                    Hue = GetObjectHue(image, contour),
-                    Contour = NormalizeContour(contour, centroidPoint, rotationAngle)
-                };
-            }
+            largestContour = Cv2.ConvexHull(largestContour);
         }
 
-        return null;
+        Vector2 centroidInCanvasSpace = CalculateAndConvertCentroid(largestContour, image, fullImage.rectTransform);
+        Point centroidPoint = new((int)centroidInCanvasSpace.x, (int)centroidInCanvasSpace.y);
+
+        RotatedRect minAreaRect = Cv2.MinAreaRect(largestContour);
+        float rotationAngle = minAreaRect.Angle;
+
+        VisualizeObject(largestContour, image, centroidInCanvasSpace, rotationAngle);
+
+        return new InitiatedObject
+        {
+            Hue = GetObjectHue(image, largestContour),
+            Contour = NormalizeContour(largestContour, centroidPoint, rotationAngle)
+        };
     }
+
 
     /// <summary>
     /// Represents a color with 32 bits per channel (RGBA).
@@ -208,6 +248,7 @@ public class ObjectInitiator : MonoBehaviour
         // Uncomment the following lines to draw the contour on the image
         // image = DrawContour(image, contour);
         // fullImage.texture = OpenCvSharp.Unity.MatToTexture(image);
+
         GameObject detectedObject = Instantiate(prefabMaterialEmpty, canvasPos);
 
         if (detectedObject.TryGetComponent(out MeshFilter meshFilter))

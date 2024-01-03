@@ -135,7 +135,7 @@ GameObject:
   - component: {fileID: 384782497}
   - component: {fileID: 384782496}
   m_Layer: 5
-  m_Name: Text (TMP)
+  m_Name: InstructionText
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -207,12 +207,12 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 25
-  m_fontSizeBase: 25
+  m_fontSize: 20
+  m_fontSizeBase: 20
   m_fontWeight: 400
-  m_enableAutoSizing: 0
+  m_enableAutoSizing: 1
   m_fontSizeMin: 18
-  m_fontSizeMax: 72
+  m_fontSizeMax: 25
   m_fontStyle: 0
   m_HorizontalAlignment: 2
   m_VerticalAlignment: 256
@@ -459,6 +459,7 @@ MonoBehaviour:
   canvasPos: {fileID: 1416648223}
   prefabMaterialEmpty: {fileID: 3295479666438238312, guid: 5a3d775d47b1a6d418628554b1a5fef2, type: 3}
   objectData: {fileID: 11400000, guid: decb7499f3955e949848fcf22ed12580, type: 2}
+  instructionText: {fileID: 384782496}
 --- !u!114 &779092893
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -472,8 +473,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   canvasPreviewImage: {fileID: 1758758653}
-  cameraRotation: 0
+  cameraRotation: 1
   fullImage: {fileID: 668560654}
+  instructionText: {fileID: 384782496}
 --- !u!114 &779092894
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -486,6 +488,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3135a3cf02df0c4448a4e90565a8b77c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  objectData: {fileID: 11400000, guid: decb7499f3955e949848fcf22ed12580, type: 2}
   instructionText: {fileID: 384782496}
   canvasPreviewer: {fileID: 1758758653}
   fullImage: {fileID: 668560654}
