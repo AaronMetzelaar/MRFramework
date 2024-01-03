@@ -34,7 +34,7 @@ public class Calibrator : MonoBehaviour
     public enum CameraRotationOption
     {
         None,
-        FlippedHorizontally,
+        FlippedVertically,
     }
 
     public CameraRotationOption CameraRotation
@@ -285,7 +285,7 @@ public class Calibrator : MonoBehaviour
     /// <returns>The rotated RawImage.</returns>
     public RawImage RotateRawImage(RawImage rawImage, CameraRotationOption rotation)
     {
-        if (rotation == CameraRotationOption.FlippedHorizontally && !isFlipped)
+        if (rotation == CameraRotationOption.FlippedVertically && !isFlipped)
         {
             rawImage.rectTransform.Rotate(0, 0, -180);
             isFlipped = true;
@@ -362,7 +362,7 @@ public class Calibrator : MonoBehaviour
     /// <returns>The swapped array of points.</returns>
     private Point[] SwapPoints(Point[] points)
     {
-        if (cameraRotation == CameraRotationOption.FlippedHorizontally)
+        if (cameraRotation == CameraRotationOption.FlippedVertically)
         {
             for (int i = 0; i < points.Length; i++)
             {
