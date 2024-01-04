@@ -110,19 +110,26 @@ public class ObjectInitiator : MonoBehaviour
     {
         differenceImage = SubtractImages(calibratorData.CalibratedImage, image);
 
-        grayImage = new Mat();
-        Cv2.CvtColor(differenceImage, grayImage, ColorConversionCodes.BGR2GRAY);
+        Mat hsvImage = new();
+        Cv2.CvtColor(differenceImage, hsvImage, ColorConversionCodes.RGB2HSV);
+
+        Cv2.Split(hsvImage, out Mat[] channels);
+        Mat grayImage = channels[2];
+        // grayImage = new();
+        // Cv2.CvtColor(differenceImage, grayImage, ColorConversionCodes.RGB2GRAY);
 
         // Apply bilateral filter to reduce noise while keeping edges sharp
-        bilateralFilterImage = new Mat();
+        Mat bilateralFilterImage = new();
         Cv2.BilateralFilter(grayImage, bilateralFilterImage, 9, 50, 50);
 
         // Use Canny edge detection as a thresholding step
-        cannyImage = new Mat();
+        Mat cannyImage = new();
         Cv2.Canny(bilateralFilterImage, cannyImage, 1, 75);
 
         kernel = Cv2.GetStructuringElement(MorphShapes.Rect, new Size(3, 3));
         Cv2.MorphologyEx(cannyImage, cannyImage, MorphTypes.Close, kernel);
+
+        fullImage.texture = OpenCvSharp.Unity.MatToTexture(grayImage);
 
         // Find the largest contour that represents the object
         InitiatedObject initiatedObject = FindContour(cannyImage, image);
