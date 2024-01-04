@@ -18,7 +18,7 @@ public class ObjectInitiator : MonoBehaviour
     [SerializeField] private ObjectData objectData;
     [SerializeField] private TextMeshProUGUI instructionText;
 
-    InitiatedObject initiatedObject = null;
+    InitializedObject initializedObject = null;
     Mat differenceImage;
     Mat grayImage;
     Mat bilateralFilterImage;
@@ -48,7 +48,7 @@ public class ObjectInitiator : MonoBehaviour
     {
         instructionText.gameObject.SetActive(false);
         yield return new WaitForSeconds(0.2f);
-        CaptureAndInitiateObject();
+        CaptureAndInitializeObject();
         yield return new WaitForSeconds(0.2f);
         instructionText.gameObject.SetActive(true);
     }
@@ -59,10 +59,11 @@ public class ObjectInitiator : MonoBehaviour
         {
             Destroy(currentVisualizedObject);
         }
-        if (initiatedObject != null)
+        if (initializedObject != null)
         {
-            initiatedObject.Contour = null;
-            initiatedObject.Hue = 0f;
+            initializedObject.Contour = null;
+            initializedObject.ObjectHue = 0f;
+            initializedObject.Color = Color.clear;
         }
 
         fullImage.texture = null;
@@ -78,7 +79,7 @@ public class ObjectInitiator : MonoBehaviour
     /// <summary>
     /// Captures an image, initiates an object, and visualizes it.
     /// </summary>
-    public void CaptureAndInitiateObject()
+    public void CaptureAndInitializeObject()
     {
         if (calibrator.CurrentCalibratorData == null)
         {
@@ -92,9 +93,9 @@ public class ObjectInitiator : MonoBehaviour
         Mat image = OpenCvSharp.Unity.TextureToMat(webCamTexture);
         Mat croppedImage = calibrator.CropImage(image, calibratorData.Corners);
 
-        initiatedObject = DetectObject(croppedImage);
+        initializedObject = DetectObject(croppedImage);
 
-        if (initiatedObject == null)
+        if (initializedObject == null)
         {
             Debug.LogError("Object not detected.");
         }
@@ -106,17 +107,32 @@ public class ObjectInitiator : MonoBehaviour
     /// </summary>
     /// <param name="image">The image in which to detect the object.</param>
     /// <returns>The detected object.</returns>
-    InitiatedObject DetectObject(Mat image)
+    InitializedObject DetectObject(Mat image)
     {
         differenceImage = SubtractImages(calibratorData.CalibratedImage, image);
+        Mat grayImage = TransformImage(differenceImage);
 
+        // fullImage.texture = OpenCvSharp.Unity.MatToTexture(grayImage);
+
+        // Find the largest contour that represents the object
+        InitializedObject initializedObject = FindContour(cannyImage, image);
+
+        if (initializedObject != null)
+        {
+            return initializedObject;
+        }
+
+        Debug.LogError("Object not detected.");
+        return null;
+    }
+
+    Mat TransformImage(Mat image)
+    {
         Mat hsvImage = new();
-        Cv2.CvtColor(differenceImage, hsvImage, ColorConversionCodes.RGB2HSV);
+        Cv2.CvtColor(image, hsvImage, ColorConversionCodes.RGB2HSV);
 
         Cv2.Split(hsvImage, out Mat[] channels);
         Mat grayImage = channels[2];
-        // grayImage = new();
-        // Cv2.CvtColor(differenceImage, grayImage, ColorConversionCodes.RGB2GRAY);
 
         // Apply bilateral filter to reduce noise while keeping edges sharp
         Mat bilateralFilterImage = new();
@@ -129,28 +145,18 @@ public class ObjectInitiator : MonoBehaviour
         kernel = Cv2.GetStructuringElement(MorphShapes.Rect, new Size(3, 3));
         Cv2.MorphologyEx(cannyImage, cannyImage, MorphTypes.Close, kernel);
 
-        fullImage.texture = OpenCvSharp.Unity.MatToTexture(grayImage);
-
-        // Find the largest contour that represents the object
-        InitiatedObject initiatedObject = FindContour(cannyImage, image);
-
-        if (initiatedObject != null)
-        {
-            return initiatedObject;
-        }
-
-        Debug.LogError("Object not detected.");
-        return null;
+        return cannyImage;
     }
+
     /// <summary>
     /// Saves the initiated object to the object data list.
     /// </summary>
     public void SaveObjectToList()
     {
-        if (initiatedObject != null)
+        if (initializedObject != null)
         {
-            objectData.objectDataList ??= new List<InitiatedObject>();
-            objectData.objectDataList.Add(initiatedObject);
+            objectData.objectDataList ??= new List<InitializedObject>();
+            objectData.objectDataList.Add(initializedObject);
         }
         else
         {
@@ -165,7 +171,7 @@ public class ObjectInitiator : MonoBehaviour
         return result;
     }
 
-    public InitiatedObject FindContour(Mat thresholdImage, Mat image)
+    public InitializedObject FindContour(Mat thresholdImage, Mat image)
     {
         Cv2.FindContours(thresholdImage, out Point[][] contours, out _, RetrievalModes.External, ContourApproximationModes.ApproxSimple);
 
@@ -200,9 +206,9 @@ public class ObjectInitiator : MonoBehaviour
 
         VisualizeObject(largestContour, image, centroidInCanvasSpace, rotationAngle);
 
-        return new InitiatedObject
+        return new InitializedObject
         {
-            Hue = GetObjectHue(image, largestContour),
+            ObjectHue = GetObjectHue(image, largestContour),
             Contour = NormalizeContour(largestContour, centroidPoint, rotationAngle)
         };
     }
@@ -246,11 +252,48 @@ public class ObjectInitiator : MonoBehaviour
     }
 
     /// <summary>
+    /// Converts a hue value to its corresponding RGB color value.
+    /// </summary>
+    /// <param name="hue">The hue value to convert.</param>
+    /// <returns>The RGB color value of the hue.</returns>
+    Vector3 HueToRgb(float hue)
+    {
+        float r = Mathf.Abs(hue * 6 - 3) - 1;
+        float g = 2 - Mathf.Abs(hue * 6 - 2);
+        float b = 2 - Mathf.Abs(hue * 6 - 4);
+
+        return new Vector3(Mathf.Clamp01(r), Mathf.Clamp01(g), Mathf.Clamp01(b));
+    }
+
+    /// <summary>
+    /// Initializes the color of the initiated object based on getting the contrasting color of the object's hue.
+    /// </summary>
+    /// <param name="hue">The hue value of the initiated object.</param>
+    /// <param name="initializedObject">The initiated object.</param>
+    public void InitializeObjectColor(float hue, InitializedObject initializedObject)
+    {
+        float contrastingHue = (hue + 0.5f) % 1f;
+        Vector3 contrastingColor = HueToRgb(contrastingHue);
+        Color color = new(contrastingColor.x, contrastingColor.y, contrastingColor.z, 1f);
+        initializedObject.Color = color;
+    }
+
+    /// <summary>
+    /// Initializes the color of the initiated object based on the given color.
+    /// </summary>
+    /// <param name="color">The color to use for the initiated object.</param>
+    public void InitializeObjectColor(Color color, InitializedObject initializedObject)
+    {
+        initializedObject.Color = color;
+    }
+
+
+    /// <summary>
     /// Visualizes the initiated object by instantiating a game object and setting its position and mesh based on the initiated object's properties.
     /// </summary>
-    /// <param name="initiatedObject">The initiated object to visualize.</param>
+    /// <param name="initializedObject">The initiated object to visualize.</param>
     /// <param name="image">The image used for visualization.</param>
-    public GameObject VisualizeObject(Point[] contour, Mat image, Vector2 centroidInCanvasSpace, float rotationAngle)
+    public GameObject VisualizeObject(Point[] contour, Mat image, Vector2 centroidInCanvasSpace, float rotationAngle, Color color = default)
     {
         // Uncomment the following lines to draw the contour on the image
         // image = DrawContour(image, contour);
@@ -265,7 +308,7 @@ public class ObjectInitiator : MonoBehaviour
 
         detectedObject.transform.localPosition = new Vector3(centroidInCanvasSpace.x, centroidInCanvasSpace.y, -0.01f); // negative z to render in front of the image
         detectedObject.transform.rotation = Quaternion.Euler(0, 0, rotationAngle);
-        detectedObject.GetComponent<MeshRenderer>().material.color = Color.blue;
+        detectedObject.GetComponent<MeshRenderer>().material.color = color;
 
         currentVisualizedObject = detectedObject;
 

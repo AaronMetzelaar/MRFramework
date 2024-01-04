@@ -2,13 +2,13 @@ using UnityEngine;
 
 public class DetectedObject : MonoBehaviour
 {
-    public InitiatedObject initiatedObject;
+    public InitializedObject initializedObject;
     public Vector2 centroidInCanvasSpace;
     public float rotationAngle;
 
-    public DetectedObject(InitiatedObject initiatedObject, Vector2 centroidInCanvasSpace, float rotationAngle)
+    public DetectedObject(InitializedObject initializedObject, Vector2 centroidInCanvasSpace, float rotationAngle)
     {
-        this.initiatedObject = initiatedObject;
+        this.initializedObject = initializedObject;
         this.centroidInCanvasSpace = centroidInCanvasSpace;
         this.rotationAngle = rotationAngle;
     }

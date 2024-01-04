@@ -18,7 +18,7 @@ public class ObjectDetector : MonoBehaviour
     [Range(0.0f, 1.0f)] public float objectMatchThreshold = 0.9f;
 
     private bool isDetecting = false;
-    private InitiatedObject[] initiatedObjects;
+    private InitializedObject[] initializedObjects;
     private Dictionary<int, GameObject> activeObjects;
     private int objectIdCount = 0;
 
@@ -49,7 +49,7 @@ public class ObjectDetector : MonoBehaviour
     public void StartDetecting()
     {
         isDetecting = !isDetecting;
-        initiatedObjects = objectData.objectDataList.ToArray();
+        initializedObjects = objectData.objectDataList.ToArray();
         activeObjects = new Dictionary<int, GameObject>();
 
         InvokeRepeating(nameof(UpdateObjects), 0.1f, 0.1f);
@@ -60,9 +60,9 @@ public class ObjectDetector : MonoBehaviour
     DetectedObject[] FindObjects(Mat image)
     {
         Cv2.FindContours(image, out Point[][] contours, out HierarchyIndex[] hierarchyIndexes, RetrievalModes.Tree, ContourApproximationModes.ApproxSimple);
-        double smallestContourArea = GetSmallestContourArea(initiatedObjects);
+        double smallestContourArea = GetSmallestContourArea(initializedObjects);
 
-        DetectedObject[] detectedObjects = new DetectedObject[initiatedObjects.Length];
+        DetectedObject[] detectedObjects = new DetectedObject[initializedObjects.Length];
 
         foreach (Point[] contour in contours.OrderByDescending(contour => Cv2.ContourArea(contour)))
         {
@@ -78,15 +78,15 @@ public class ObjectDetector : MonoBehaviour
             Point[] normalizedContour = objectInitiator.NormalizeContour(contour, centroidPoint, rotationAngle);
             float hue = objectInitiator.GetObjectHue(image, contour);
 
-            foreach (InitiatedObject initiatedObject in initiatedObjects)
+            foreach (InitializedObject initializedObject in initializedObjects)
             {
-                double matchShapeScore = Cv2.MatchShapes(normalizedContour, initiatedObject.Contour, ShapeMatchModes.I1);
+                double matchShapeScore = Cv2.MatchShapes(normalizedContour, initializedObject.Contour, ShapeMatchModes.I1);
                 if (matchShapeScore > objectMatchThreshold)
                 {
-                    detectedObjects[Array.IndexOf(initiatedObjects, initiatedObject)] = gameObject.AddComponent<DetectedObject>();
-                    detectedObjects[Array.IndexOf(initiatedObjects, initiatedObject)].initiatedObject = initiatedObject;
-                    detectedObjects[Array.IndexOf(initiatedObjects, initiatedObject)].centroidInCanvasSpace = centroidInCanvasSpace;
-                    detectedObjects[Array.IndexOf(initiatedObjects, initiatedObject)].rotationAngle = rotationAngle;
+                    detectedObjects[Array.IndexOf(initializedObjects, initializedObject)] = gameObject.AddComponent<DetectedObject>();
+                    detectedObjects[Array.IndexOf(initializedObjects, initializedObject)].initializedObject = initializedObject;
+                    detectedObjects[Array.IndexOf(initializedObjects, initializedObject)].centroidInCanvasSpace = centroidInCanvasSpace;
+                    detectedObjects[Array.IndexOf(initializedObjects, initializedObject)].rotationAngle = rotationAngle;
                 }
             }
         }
@@ -110,7 +110,7 @@ public class ObjectDetector : MonoBehaviour
             }
             else
             {
-                GameObject gameObject = objectInitiator.VisualizeObject(detectedObject.initiatedObject.Contour, image, detectedObject.centroidInCanvasSpace, detectedObject.rotationAngle);
+                GameObject gameObject = objectInitiator.VisualizeObject(detectedObject.initializedObject.Contour, image, detectedObject.centroidInCanvasSpace, detectedObject.rotationAngle);
                 activeObjects.Add(objectId, gameObject);
             }
         }
@@ -121,7 +121,7 @@ public class ObjectDetector : MonoBehaviour
     private int GetObjectId(DetectedObject detectedObject)
     {
         int positionHash = detectedObject.centroidInCanvasSpace.GetHashCode();
-        int sizeHash = detectedObject.initiatedObject.Contour.Length.GetHashCode();
+        int sizeHash = detectedObject.initializedObject.Contour.Length.GetHashCode();
 
         return positionHash + sizeHash;
     }
@@ -152,14 +152,14 @@ public class ObjectDetector : MonoBehaviour
     /// <summary>
     /// Calculates and returns the smallest contour area from the given array of initiated objects.
     /// </summary>
-    /// <param name="initiatedObjects">The array of initiated objects.</param>
+    /// <param name="initializedObjects">The array of initiated objects.</param>
     /// <returns>The smallest contour area.</returns>
-    double GetSmallestContourArea(InitiatedObject[] initiatedObjects)
+    double GetSmallestContourArea(InitializedObject[] initializedObjects)
     {
         double smallestArea = float.MaxValue;
-        foreach (InitiatedObject initiatedObject in initiatedObjects)
+        foreach (InitializedObject initializedObject in initializedObjects)
         {
-            double area = Cv2.ContourArea(initiatedObject.Contour);
+            double area = Cv2.ContourArea(initializedObject.Contour);
             if (area < smallestArea)
             {
                 smallestArea = area;
