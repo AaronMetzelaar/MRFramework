@@ -5,7 +5,7 @@ using UnityEngine;
 /// <summary>
 /// This class is used to demonstrate the usage of the framework.
 /// It is necessary to pass an array of the different kinds of objects
-/// to the ObjectInitiator, so that they can be assigned a real object.
+/// to the ObjectInitializer, so that they can be assigned a real object.
 /// </summary>
 public class SampleSimulation : MonoBehaviour
 {

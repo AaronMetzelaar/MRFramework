@@ -6,7 +6,7 @@ using UnityEngine.UI;
 using System.Collections.Generic;
 using System.Collections;
 using TMPro;
-public class ObjectInitiator : MonoBehaviour
+public class ObjectInitializer : MonoBehaviour
 {
     private Calibrator calibrator;
     private CalibratorData calibratorData;

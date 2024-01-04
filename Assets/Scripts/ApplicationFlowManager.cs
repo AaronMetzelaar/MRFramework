@@ -13,7 +13,7 @@ public class ApplicationFlowManager : MonoBehaviour
     }
 
     [NonSerialized] private Calibrator calibrator;
-    [NonSerialized] private ObjectInitiator objectInitiator;
+    [NonSerialized] private ObjectInitializer objectInitializer;
     [NonSerialized] public ObjectDetector objectDetector;
     [SerializeField] private ObjectData objectData;
     [SerializeField] private TextMeshProUGUI instructionText;
@@ -36,9 +36,9 @@ public class ApplicationFlowManager : MonoBehaviour
             Debug.LogError("Calibrator not found in the scene.");
         }
 
-        if (!TryGetComponent(out objectInitiator))
+        if (!TryGetComponent(out objectInitializer))
         {
-            Debug.LogError("ObjectInitiator not found in the scene.");
+            Debug.LogError("ObjectInitializer not found in the scene.");
         }
 
         if (!TryGetComponent(out objectDetector))
@@ -69,8 +69,8 @@ public class ApplicationFlowManager : MonoBehaviour
                 {
                     currentState = AppState.Initiation;
                     calibrator.isCalibrating = false;
-                    objectInitiator.webCamTexture = calibrator.webcamTexture;
-                    objectInitiator.Initialize();
+                    objectInitializer.webCamTexture = calibrator.webcamTexture;
+                    objectInitializer.Initialize();
                     canvasPreviewer.enabled = false;
                     instructionText.text = "Place your object in the center of the canvas.\n\n" +
                                            "Press <b>Spacebar</b> to initiate object detection.\n" +
@@ -83,17 +83,17 @@ public class ApplicationFlowManager : MonoBehaviour
                     if (firstInitiation)
                     {
                         firstInitiation = false;
-                        StartCoroutine(objectInitiator.DelayedInitiate());
+                        StartCoroutine(objectInitializer.DelayedInitiate());
                     }
                     else
                     {
-                        objectInitiator.Reinitiate();
+                        objectInitializer.Reinitiate();
                     }
                 }
                 if (Input.GetKeyDown(KeyCode.Return))
                 {
-                    objectInitiator.SaveObjectToList();
-                    Destroy(objectInitiator.currentVisualizedObject);
+                    objectInitializer.SaveObjectToList();
+                    Destroy(objectInitializer.currentVisualizedObject);
                     fullImage.texture = null;
                     currentState = AppState.Simulation;
                     instructionText.text = "Press <b>Spacebar</b> to initiate object detection.";

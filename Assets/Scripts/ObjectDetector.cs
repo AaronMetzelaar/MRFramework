@@ -9,7 +9,7 @@ public class ObjectDetector : MonoBehaviour
 {
     private readonly Calibrator calibrator;
     private readonly CalibratorData calibratorData;
-    private ObjectInitiator objectInitiator;
+    private ObjectInitializer objectInitializer;
     private ObjectDetector objectDetector;
     [NonSerialized] public WebCamTexture webCamTexture;
     [SerializeField] private RawImage fullImage;
@@ -24,9 +24,9 @@ public class ObjectDetector : MonoBehaviour
 
     public void Initialize()
     {
-        if (!TryGetComponent(out objectInitiator))
+        if (!TryGetComponent(out objectInitializer))
         {
-            Debug.LogError("ObjectInitiator not found in the scene.");
+            Debug.LogError("ObjectInitializer not found in the scene.");
         }
         if (webCamTexture == null)
         {
@@ -71,12 +71,12 @@ public class ObjectDetector : MonoBehaviour
                 break; // No more objects to detect
             }
 
-            Vector2 centroidInCanvasSpace = objectInitiator.CalculateAndConvertCentroid(contour, image, fullImage.rectTransform);
+            Vector2 centroidInCanvasSpace = objectInitializer.CalculateAndConvertCentroid(contour, image, fullImage.rectTransform);
             Point centroidPoint = new((int)centroidInCanvasSpace.x, (int)centroidInCanvasSpace.y);
             RotatedRect minAreaRect = Cv2.MinAreaRect(contour);
             float rotationAngle = minAreaRect.Angle;
-            Point[] normalizedContour = objectInitiator.NormalizeContour(contour, centroidPoint, rotationAngle);
-            float hue = objectInitiator.GetObjectHue(image, contour);
+            Point[] normalizedContour = objectInitializer.NormalizeContour(contour, centroidPoint, rotationAngle);
+            float hue = objectInitializer.GetObjectHue(image, contour);
 
             foreach (InitializedObject initializedObject in initializedObjects)
             {
@@ -110,7 +110,7 @@ public class ObjectDetector : MonoBehaviour
             }
             else
             {
-                GameObject gameObject = objectInitiator.VisualizeObject(detectedObject.initializedObject.Contour, image, detectedObject.centroidInCanvasSpace, detectedObject.rotationAngle);
+                GameObject gameObject = objectInitializer.VisualizeObject(detectedObject.initializedObject.Contour, image, detectedObject.centroidInCanvasSpace, detectedObject.rotationAngle);
                 activeObjects.Add(objectId, gameObject);
             }
         }
