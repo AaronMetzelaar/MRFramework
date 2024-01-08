@@ -17,7 +17,7 @@ public class ObjectInitializer : MonoBehaviour
     [SerializeField] private GameObject prefabMaterialEmpty;
     [SerializeField] private ObjectData objectData;
     [SerializeField] private TextMeshProUGUI instructionText;
-    [SerializeField] private Color objectColor;
+    [SerializeField] private Color objectColor = default;
 
     InitializedObject initializedObject = new();
     Mat differenceImage;
@@ -90,8 +90,7 @@ public class ObjectInitializer : MonoBehaviour
 
         initializedObject = new InitializedObject();
 
-        if
-            (fullImage.gameObject.activeSelf == false) fullImage.gameObject.SetActive(true);
+        if (fullImage.gameObject.activeSelf == false) fullImage.gameObject.SetActive(true);
 
         Mat image = OpenCvSharp.Unity.TextureToMat(webCamTexture);
         Mat croppedImage = calibrator.CropImage(image, calibratorData.Corners);
@@ -181,8 +180,9 @@ public class ObjectInitializer : MonoBehaviour
 
         RotatedRect minAreaRect = Cv2.MinAreaRect(largestContour);
         float rotationAngle = minAreaRect.Angle;
+        Color color = objectColor == default ? GetContrastingColor(initializedObject.ObjectHue) : objectColor;
 
-        VisualizeObject(largestContour, image, centroidInCanvasSpace, rotationAngle);
+        VisualizeObject(largestContour, image, centroidInCanvasSpace, rotationAngle, color);
 
         return largestContour;
     }
