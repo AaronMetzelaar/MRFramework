@@ -6,7 +6,6 @@ using System.Collections;
 using System;
 using TMPro;
 
-
 /// <summary>
 /// The Calibrator class is responsible for calibrating the camera and detecting corners in the camera feed.
 /// It uses OpenCV for corner detection and perspective transformation.
@@ -34,8 +33,11 @@ public class Calibrator : MonoBehaviour
     public enum CameraRotationOption
     {
         None,
-        FlippedVertically,
+        MirroredVertically,
+        MirroredHorizontally,
+        MirroredBoth
     }
+
 
     public CameraRotationOption CameraRotation
     {
@@ -49,7 +51,6 @@ public class Calibrator : MonoBehaviour
             StartCoroutine(Recalibrate());
         }
     }
-
 
     /// <summary>
     /// This method is called when the script instance is being loaded.
@@ -105,23 +106,15 @@ public class Calibrator : MonoBehaviour
             // Draw the rectangle on the screen
             Mat image = OpenCvSharp.Unity.TextureToMat(TextureToTexture2D(webcamTexture));
             Mat croppedImage = CropImage(image, corners);
-            CurrentCalibratorData = new CalibratorData(corners, transformationMatrix, croppedImage, cameraRotation);
-
-
             Cv2.Polylines(image, new[] { gameCorners }, true, Scalar.Green, 5);
 
             // Rotate the webcam texture
             canvasPreviewImage = RotateRawImage(canvasPreviewImage, cameraRotation);
 
-
-            // To show only the detected rectangle, crop the image to the rectangle
-            // Mat transformedImage = new Mat();
-            // Cv2.WarpPerspective(image, transformedImage, transformationMatrix, new Size(Screen.width, Screen.height));
-
-            // fullCanvas.texture = OpenCvSharp.Unity.MatToTexture(transformedImage);
+            // Save the calibration data
+            CurrentCalibratorData = new CalibratorData(corners, transformationMatrix, croppedImage, cameraRotation);
         }
     }
-
 
     /// <summary>
     /// Coroutine that recalibrates the canvas corner detection.
@@ -285,7 +278,7 @@ public class Calibrator : MonoBehaviour
     /// <returns>The rotated RawImage.</returns>
     public RawImage RotateRawImage(RawImage rawImage, CameraRotationOption rotation)
     {
-        if (rotation == CameraRotationOption.FlippedVertically && !isFlipped)
+        if (rotation == CameraRotationOption.MirroredVertically && !isFlipped)
         {
             rawImage.rectTransform.Rotate(0, 0, -180);
             isFlipped = true;
@@ -298,7 +291,6 @@ public class Calibrator : MonoBehaviour
 
         return rawImage;
     }
-
 
     /// <summary>
     /// Calculates the transformation matrix for perspective transformation.
@@ -313,14 +305,44 @@ public class Calibrator : MonoBehaviour
         Point2f[] sourcePoints = OrderCorners(corners.Select(corner => new Point2f(corner.X, corner.Y)).ToArray());
 
         // The corner points of the camera feed
-        Point2f[] destinationPoints = new Point2f[]
-        {
-            new(0, 0),                          // Top left
-            new(Screen.width, 0),               // Top right
-            new(Screen.width, Screen.height),   // Bottom right
-            new(0, Screen.height),              // Bottom left
-        };
+        Point2f[] destinationPoints = new Point2f[4];
 
+        if (cameraRotation == CameraRotationOption.None)
+        {
+            destinationPoints = new Point2f[] {
+                    new(0, 0),                          // Top left
+                    new(Screen.width, 0),               // Top right
+                    new(Screen.width, Screen.height),   // Bottom right
+                    new(0, Screen.height),              // Bottom left
+                };
+        }
+        else if (cameraRotation == CameraRotationOption.MirroredBoth)
+        {
+            destinationPoints = new Point2f[] {
+                    new(Screen.width, Screen.height),
+                    new(0, Screen.height),
+                    new(0, 0),
+                    new(Screen.width, 0),
+                };
+        }
+        else if (cameraRotation == CameraRotationOption.MirroredHorizontally)
+        {
+            destinationPoints = new Point2f[] {
+                    new(0, Screen.height),
+                    new(Screen.width, Screen.height),
+                    new(Screen.width, 0),
+                    new(0, 0),
+                };
+        }
+        else if (cameraRotation == CameraRotationOption.MirroredVertically)
+        {
+            destinationPoints = new Point2f[] {
+                    new(Screen.width, 0),
+                    new(0, 0),
+                    new(0, Screen.height),
+                    new(Screen.width, Screen.height),
+                };
+        }
         Mat transformationMatrix = Cv2.GetPerspectiveTransform(sourcePoints, destinationPoints);
 
         return transformationMatrix;
@@ -356,13 +378,13 @@ public class Calibrator : MonoBehaviour
     }
 
     /// <summary>
-    /// Swaps the points if the camera rotation option is different.
+    /// Swaps points in a given array of points based on the camera rotation option.
     /// </summary>
     /// <param name="points">The array of points to be swapped.</param>
     /// <returns>The swapped array of points.</returns>
     private Point[] SwapPoints(Point[] points)
     {
-        if (cameraRotation == CameraRotationOption.FlippedVertically)
+        if (cameraRotation == CameraRotationOption.MirroredVertically)
         {
             for (int i = 0; i < points.Length; i++)
             {

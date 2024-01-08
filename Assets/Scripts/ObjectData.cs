@@ -10,5 +10,4 @@ public class ObjectData : ScriptableObject
     {
         objectDataList.Clear();
     }
-
 }

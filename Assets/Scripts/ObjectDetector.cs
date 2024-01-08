@@ -76,7 +76,7 @@ public class ObjectDetector : MonoBehaviour
             RotatedRect minAreaRect = Cv2.MinAreaRect(contour);
             float rotationAngle = minAreaRect.Angle;
             Point[] normalizedContour = objectInitializer.NormalizeContour(contour, centroidPoint, rotationAngle);
-            float hue = objectInitializer.GetObjectHue(image, contour);
+            float hue = objectInitializer.GetObjectHue(image, contour, image);
 
             foreach (InitializedObject initializedObject in initializedObjects)
             {

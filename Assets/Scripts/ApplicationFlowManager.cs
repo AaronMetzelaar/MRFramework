@@ -19,6 +19,8 @@ public class ApplicationFlowManager : MonoBehaviour
     [SerializeField] private TextMeshProUGUI instructionText;
     [SerializeField] private RawImage canvasPreviewer;
     [SerializeField] private RawImage fullImage;
+    [Tooltip("Enable this to save the initialized object data between sessions, skipping the initiation step.")]
+    [SerializeField] public bool saveObjectData = false;
     private AppState currentState = AppState.Calibration;
     private bool firstInitiation = true;
 
@@ -45,7 +47,7 @@ public class ApplicationFlowManager : MonoBehaviour
         {
             Debug.LogError("ObjectDetector not found in the scene.");
         }
-        // Set initial instruction text
+
         instructionText.text = "If the border is incorrect, make sure the entire playing field is visible.\n" +
                                "Also, make sure there is enough contrast between the playing field\n" +
                                "and the surface underneath.\n\n" +
@@ -67,14 +69,25 @@ public class ApplicationFlowManager : MonoBehaviour
                 }
                 if (Input.GetKeyDown(KeyCode.Return))
                 {
-                    currentState = AppState.Initiation;
                     calibrator.isCalibrating = false;
                     objectInitializer.webCamTexture = calibrator.webcamTexture;
-                    objectInitializer.Initialize();
                     canvasPreviewer.enabled = false;
-                    instructionText.text = "Place your object in the center of the canvas.\n\n" +
-                                           "Press <b>Spacebar</b> to initiate object detection.\n" +
-                                           "Press <b>Enter</b> when satisfied.";
+
+                    if (saveObjectData && objectData.objectDataList.Count > 0)
+                    {
+                        // firstInitiation = false;
+                        // objectInitializer.Initialize();
+                        currentState = AppState.Simulation;
+                        instructionText.text = "Press <b>Spacebar</b> to initiate object detection.\n";
+                    }
+                    else
+                    {
+                        currentState = AppState.Initiation;
+                        objectInitializer.Initialize();
+                        instructionText.text = "Place your object in the center of the canvas.\n\n" +
+                                               "Press <b>Spacebar</b> to initiate object detection.\n" +
+                                               "Press <b>Enter</b> when satisfied.";
+                    }
                 }
                 break;
             case AppState.Initiation:
@@ -111,9 +124,7 @@ public class ApplicationFlowManager : MonoBehaviour
 
     void OnApplicationQuit()
     {
-        // Comment this line if you want to keep the object data between sessions.
-        // Not recommended over longer periods of time, as the object data might
-        // become outdated.
-        objectData.ClearData();
+        if (!saveObjectData)
+            objectData.ClearData();
     }
 }

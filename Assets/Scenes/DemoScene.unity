@@ -460,6 +460,7 @@ MonoBehaviour:
   prefabMaterialEmpty: {fileID: 3295479666438238312, guid: 5a3d775d47b1a6d418628554b1a5fef2, type: 3}
   objectData: {fileID: 11400000, guid: decb7499f3955e949848fcf22ed12580, type: 2}
   instructionText: {fileID: 384782496}
+  objectColor: {r: 0, g: 0, b: 0, a: 0}
 --- !u!114 &779092893
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -492,6 +493,7 @@ MonoBehaviour:
   instructionText: {fileID: 384782496}
   canvasPreviewer: {fileID: 1758758653}
   fullImage: {fileID: 668560654}
+  saveObjectData: 0
 --- !u!4 &779092895
 Transform:
   m_ObjectHideFlags: 0
