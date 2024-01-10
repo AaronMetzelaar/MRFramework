@@ -318,7 +318,7 @@ RectTransform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 668560653}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 0, y: 0, z: -962.8}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -460,7 +460,7 @@ MonoBehaviour:
   prefabMaterialEmpty: {fileID: 3295479666438238312, guid: 5a3d775d47b1a6d418628554b1a5fef2, type: 3}
   objectData: {fileID: 11400000, guid: decb7499f3955e949848fcf22ed12580, type: 2}
   instructionText: {fileID: 384782496}
-  objectColor: {r: 0, g: 0, b: 0, a: 0}
+  objectColor: {r: 0, g: 1, b: 0.09368992, a: 0}
 --- !u!114 &779092893
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -474,7 +474,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   canvasPreviewImage: {fileID: 1758758653}
-  cameraRotation: 1
+  cameraRotation: 3
   fullImage: {fileID: 668560654}
   instructionText: {fileID: 384782496}
 --- !u!114 &779092894
@@ -524,6 +524,8 @@ MonoBehaviour:
   fullImage: {fileID: 668560654}
   objectData: {fileID: 11400000, guid: decb7499f3955e949848fcf22ed12580, type: 2}
   objectMatchThreshold: 0.9
+  detectionInterval: 0.1
+  positionMargin: 88.6
 --- !u!1 &950920451
 GameObject:
   m_ObjectHideFlags: 0

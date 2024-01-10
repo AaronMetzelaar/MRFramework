@@ -75,8 +75,6 @@ public class ApplicationFlowManager : MonoBehaviour
 
                     if (saveObjectData && objectData.objectDataList.Count > 0)
                     {
-                        // firstInitiation = false;
-                        // objectInitializer.Initialize();
                         currentState = AppState.Simulation;
                         instructionText.text = "Press <b>Spacebar</b> to initiate object detection.\n";
                     }
@@ -85,8 +83,7 @@ public class ApplicationFlowManager : MonoBehaviour
                         currentState = AppState.Initiation;
                         objectInitializer.Initialize();
                         instructionText.text = "Place your object in the center of the canvas.\n\n" +
-                                               "Press <b>Spacebar</b> to initiate object detection.\n" +
-                                               "Press <b>Enter</b> when satisfied.";
+                                               "Press <b>Spacebar</b> to initiate object detection.\n";
                     }
                 }
                 break;
@@ -97,6 +94,9 @@ public class ApplicationFlowManager : MonoBehaviour
                     {
                         firstInitiation = false;
                         StartCoroutine(objectInitializer.DelayedInitiate());
+                        instructionText.text = "To change the color of the object, go to ApplicationManager > Object Initializer > Object Color.\n\n" +
+                                               "Press <b>Spacebar</b> to reinitialize.\n" +
+                                               "Press <b>Enter</b> to save the object and continue.";
                     }
                     else
                     {
@@ -115,8 +115,14 @@ public class ApplicationFlowManager : MonoBehaviour
             case AppState.Simulation:
                 if (Input.GetKeyDown(KeyCode.Space))
                 {
+                    objectDetector.webCamTexture = calibrator.webcamTexture;
                     instructionText.text = null;
+                    objectDetector.Initialize();
                     objectDetector.StartDetecting();
+                }
+                if (Input.GetKeyDown(KeyCode.Return))
+                {
+                    objectDetector.StopDetecting();
                 }
                 break;
         }

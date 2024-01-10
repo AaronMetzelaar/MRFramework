@@ -81,8 +81,6 @@ public class Calibrator : MonoBehaviour
     /// </summary>
     private void RunDetection()
     {
-        // Debug the camera size
-        Debug.Log("Camera size: " + webcamTexture.width + "x" + webcamTexture.height);
         if (webcamTexture != null && webcamTexture.isPlaying)
         {
             Point[] corners = DetectCorners(webcamTexture);
