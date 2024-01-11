@@ -6,14 +6,18 @@ public class CalibratorData
 {
     public Point[] Corners;
     public Mat TransformationMatrix;
-    public Mat CalibratedImage;
+    public Mat CameraMatrix;
+    public Mat DistortionCoefficients;
+    public Mat BaseImage;
     public Calibrator.CameraRotationOption CameraRotation;
 
-    public CalibratorData(Point[] corners, Mat transformationMatrix, Mat calibratedImage, Calibrator.CameraRotationOption cameraRotation)
+    public CalibratorData(Point[] corners, Mat transformationMatrix, Mat cameraMatrix, Mat distortionCoefficients, Mat baseImage, Calibrator.CameraRotationOption cameraRotation)
     {
         Corners = corners ?? throw new ArgumentNullException(nameof(corners));
+        CameraMatrix = cameraMatrix ?? throw new ArgumentNullException(nameof(cameraMatrix));
+        DistortionCoefficients = distortionCoefficients ?? throw new ArgumentNullException(nameof(distortionCoefficients));
         TransformationMatrix = transformationMatrix ?? throw new ArgumentNullException(nameof(transformationMatrix));
-        CalibratedImage = calibratedImage ?? throw new ArgumentNullException(nameof(calibratedImage));
+        BaseImage = baseImage ?? throw new ArgumentNullException(nameof(baseImage));
         CameraRotation = cameraRotation;
     }
 }

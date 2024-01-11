@@ -17,7 +17,7 @@ public class ApplicationFlowManager : MonoBehaviour
     [NonSerialized] public ObjectDetector objectDetector;
     [SerializeField] private ObjectData objectData;
     [SerializeField] private TextMeshProUGUI instructionText;
-    [SerializeField] private RawImage canvasPreviewer;
+    [SerializeField] private RawImage canvasPreviewImage;
     [SerializeField] private RawImage fullImage;
     [Tooltip("Enable this to save the initialized object data between sessions, skipping the initiation step.")]
     [SerializeField] public bool saveObjectData = false;
@@ -31,9 +31,7 @@ public class ApplicationFlowManager : MonoBehaviour
     /// </summary>
     void Start()
     {
-        calibrator = GetComponent<Calibrator>();
-        fullImage.gameObject.SetActive(false);
-        if (calibrator == null)
+        if (!TryGetComponent(out calibrator))
         {
             Debug.LogError("Calibrator not found in the scene.");
         }
@@ -71,7 +69,7 @@ public class ApplicationFlowManager : MonoBehaviour
                 {
                     calibrator.isCalibrating = false;
                     objectInitializer.webCamTexture = calibrator.webcamTexture;
-                    canvasPreviewer.enabled = false;
+                    canvasPreviewImage.enabled = false;
 
                     if (saveObjectData && objectData.objectDataList.Count > 0)
                     {

@@ -1,16 +1,17 @@
 using UnityEngine;
+using Point = OpenCvSharp.Point;
 
 public class DetectedObject : MonoBehaviour
 {
     public InitializedObject initializedObject;
     public Vector2 centroidInCanvasSpace;
-    public float rotationAngle;
+    public Point[] contour;
 
-    public DetectedObject(InitializedObject initializedObject, Vector2 centroidInCanvasSpace, float rotationAngle)
+    public DetectedObject(InitializedObject initializedObject, Vector2 centroidInCanvasSpace, Point[] contour)
     {
         this.initializedObject = initializedObject;
         this.centroidInCanvasSpace = centroidInCanvasSpace;
-        this.rotationAngle = rotationAngle;
+        this.contour = contour;
     }
 
     public void UpdatePosition(Vector2 centroidInCanvasSpace)

@@ -83,8 +83,8 @@ public class ObjectDetector : MonoBehaviour
         if (!isDetecting) return;
 
         using Mat image = OpenCvSharp.Unity.TextureToMat(webCamTexture);
-        using Mat croppedImage = calibrator.CropImage(image, calibratorData.Corners);
-        using Mat transformedImage = objectInitializer.TransformImage(croppedImage);
+        using Mat undistortedCroppedImage = calibrator.GetUndistortedCroppedImage(image, calibratorData.TransformationMatrix, calibratorData.CameraMatrix, calibratorData.DistortionCoefficients);
+        using Mat transformedImage = objectInitializer.TransformImage(undistortedCroppedImage);
         fullImage.texture = OpenCvSharp.Unity.MatToTexture(transformedImage);
         List<DetectedObject> detectedObjects = FindObjects(transformedImage);
         ProcessDetectedObjects(detectedObjects, transformedImage);
@@ -113,7 +113,7 @@ public class ObjectDetector : MonoBehaviour
 
             foreach (InitializedObject initializedObject in initializedObjects)
             {
-                double matchShapeScore = Cv2.MatchShapes(contour, initializedObject.Contour, ShapeMatchModes.I1);
+                double matchShapeScore = Cv2.MatchShapes(contour, initializedObject.Contour, ShapeMatchModes.I2);
                 Debug.Log("Match score: " + matchShapeScore);
                 if (matchShapeScore < objectMatchThreshold)
                 {
@@ -125,7 +125,8 @@ public class ObjectDetector : MonoBehaviour
                     DetectedObject detectedObject = gameObject.AddComponent<DetectedObject>();
                     detectedObject.initializedObject = initializedObject;
                     detectedObject.centroidInCanvasSpace = centroidInCanvasSpace;
-                    detectedObject.rotationAngle = rotationAngle;
+                    detectedObject.contour = contour;
+                    // detectedObject.rotationAngle = rotationAngle;
                     detectedObjects.Add(detectedObject);
                     Debug.Log("Object detected! Centroid: " + centroidInCanvasSpace.x + ", " + centroidInCanvasSpace.y + " Rotation angle: " + rotationAngle + " Hue: " + hue + " Match score: " + matchShapeScore);
                 }
@@ -157,7 +158,9 @@ public class ObjectDetector : MonoBehaviour
             }
             else
             {
-                GameObject gameObject = objectInitializer.VisualizeObject(detectedObject.initializedObject.Contour, image, detectedObject.centroidInCanvasSpace, detectedObject.rotationAngle, detectedObject.initializedObject.Color);
+                Point[] normalizedContour = objectInitializer.NormalizeContour(detectedObject.contour, detectedObject.centroidInCanvasSpace, image.Width, image.Height);
+                GameObject gameObject = objectInitializer.VisualizeObject(normalizedContour, image, detectedObject.centroidInCanvasSpace, detectedObject.initializedObject.Color, true);
+                gameObject.transform.localPosition = new Vector3(detectedObject.centroidInCanvasSpace.x, detectedObject.centroidInCanvasSpace.y, 0);
                 activeObjects.Add(objectId, gameObject);
             }
         }
@@ -172,9 +175,9 @@ public class ObjectDetector : MonoBehaviour
     /// <returns>The unique identifier for the detected object.</returns>
     private DetectedValues GetObjectId(DetectedObject detectedObject)
     {
-        int positionHashX = Mathf.RoundToInt(detectedObject.centroidInCanvasSpace.x * (1f / (positionMargin)));
-        int positionHashY = Mathf.RoundToInt(detectedObject.centroidInCanvasSpace.y * (1f / (positionMargin)));
-        float sizeHash = Mathf.RoundToInt(detectedObject.initializedObject.Contour.Length * (1f / (positionMargin)));
+        int positionHashX = Mathf.RoundToInt(detectedObject.centroidInCanvasSpace.x * (1f / positionMargin));
+        int positionHashY = Mathf.RoundToInt(detectedObject.centroidInCanvasSpace.y * (1f / positionMargin));
+        float sizeHash = Mathf.RoundToInt(detectedObject.initializedObject.Contour.Length * (1f / positionMargin));
         Debug.Log("Position hashX: " + positionHashX + " Position hashY: " + positionHashY + " Size hash: " + sizeHash);
         return new DetectedValues { centroidInCanvasSpace = new Vector2(positionHashX, positionHashY), sizeHash = sizeHash };
     }
@@ -193,7 +196,6 @@ public class ObjectDetector : MonoBehaviour
     private void UpdateGameObject(GameObject gameObject, DetectedObject detectedObject)
     {
         gameObject.GetComponent<DetectedObject>().UpdatePosition(detectedObject.centroidInCanvasSpace);
-        gameObject.GetComponent<DetectedObject>().UpdateRotation(detectedObject.rotationAngle);
     }
 
     /// <summary>

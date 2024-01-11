@@ -318,7 +318,7 @@ RectTransform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 668560653}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: -962.8}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -477,6 +477,7 @@ MonoBehaviour:
   cameraRotation: 3
   fullImage: {fileID: 668560654}
   instructionText: {fileID: 384782496}
+  calibrationImage: {fileID: 2800000, guid: a30db7ada7888b74d9b4241c2f92bd40, type: 3}
 --- !u!114 &779092894
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -491,7 +492,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   objectData: {fileID: 11400000, guid: decb7499f3955e949848fcf22ed12580, type: 2}
   instructionText: {fileID: 384782496}
-  canvasPreviewer: {fileID: 1758758653}
+  canvasPreviewImage: {fileID: 0}
   fullImage: {fileID: 668560654}
   saveObjectData: 0
 --- !u!4 &779092895
@@ -523,8 +524,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   fullImage: {fileID: 668560654}
   objectData: {fileID: 11400000, guid: decb7499f3955e949848fcf22ed12580, type: 2}
-  objectMatchThreshold: 0.9
-  detectionInterval: 0.1
+  objectMatchThreshold: 0.353
+  detectionInterval: 0.5
   positionMargin: 88.6
 --- !u!1 &950920451
 GameObject:
