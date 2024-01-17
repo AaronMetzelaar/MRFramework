@@ -22,7 +22,6 @@ public class Calibrator : MonoBehaviour
     [NonSerialized] public WebCamTexture webcamTexture;
     // Public property for the camera rotation
     [SerializeField] private CameraRotationOption cameraRotation;
-
     [SerializeField] public RawImage fullImage;
     [SerializeField] public TextMeshProUGUI instructionText;
     [SerializeField] public Texture2D calibrationImage;
@@ -33,6 +32,7 @@ public class Calibrator : MonoBehaviour
     [NonSerialized] public bool isCalibrating = true;
     private Mat cameraMatrix;
     private Mat distortionCoefficients;
+    private Mat transformationMatrix;
 
     // Enum for camera rotation options
     public enum CameraRotationOption
@@ -101,6 +101,12 @@ public class Calibrator : MonoBehaviour
         // Give the camera some time to take a picture
         yield return new WaitForSeconds(0.2f);
         RunDetection();
+        fullImage.gameObject.SetActive(false);
+        instructionText.gameObject.SetActive(true);
+        instructionText.text = "Rectangle set.\n\n" +
+                                "Press <b>Spacebar</b> to recalibrate the rectangle.\n" +
+                                "Press <b>B</b> to set a new base image based on the current found rectangle.\n" +
+                               "Press <b>Enter</b> to continue.";
     }
 
     /// <summary>
@@ -125,55 +131,71 @@ public class Calibrator : MonoBehaviour
                 return;
             }
 
-            Mat transformationMatrix = GetTransformationMatrix(corners);
+            transformationMatrix = GetTransformationMatrix(corners);
             Mat croppedImage = CropImage(image, corners);
 
             ChequerboardCalibration(croppedImage);
-            // Mat undistortedImage = ChequerboardCalibration(image);
+            Point[] undistortedCorners = UndistortPoints(corners, cameraMatrix, distortionCoefficients);
 
-            // Convert the points to the game's coordinate system
-            // Point[] gameCorners = corners.Select(corner => MapCameraPointToGame(corner, transformationMatrix)).ToArray();
-            // Debug.Log("Game corners: " + gameCorners[0] + ", " + gameCorners[1] + ", " + gameCorners[2] + ", " + gameCorners[3]);
-            // Point[] undistortedGameCorners = UndistortPoints(corners, cameraMatrix, distortionCoefficients);
-            // undistortedGameCorners = undistortedGameCorners.Select(corner => MapCameraPointToGame(corner, transformationMatrix)).ToArray();
-            // Debug.Log("Game corners: " + undistortedGameCorners[0] + ", " + undistortedGameCorners[1] + ", " + undistortedGameCorners[2] + ", " + undistortedGameCorners[3]);
+            Mat baseImage = await GetBaseImageAsync();
 
-            // Swap points if camera rotation option is different
-            // if (cameraRotation != CameraRotationOption.None)
-            // {
-            //     gameCorners = SwapPoints(gameCorners);
-            // }
-
-            Mat baseImage = await GetBaseImageAsync(transformationMatrix, cameraMatrix, distortionCoefficients);
-
+            instructionText.gameObject.SetActive(true);
             canvasPreviewImage.gameObject.SetActive(true);
             canvasPreviewImage = RotateRawImage(canvasPreviewImage, cameraRotation);
-            // canvasPreviewImage.texture = OpenCvSharp.Unity.MatToTexture(baseImage);
 
             // Save the calibration data
-            CurrentCalibratorData = new CalibratorData(corners, transformationMatrix, cameraMatrix, distortionCoefficients, baseImage, cameraRotation);
+            CurrentCalibratorData = new CalibratorData(undistortedCorners, transformationMatrix, cameraMatrix, distortionCoefficients, baseImage, cameraRotation);
         }
     }
 
-    // Gets an image of the cropped and distorted board without anything projected on it
-    public async Task<Mat> GetBaseImageAsync(Mat transformationMatrix, Mat cameraMatrix, Mat distortionCoefficients)
+    public async void SetBaseImage()
     {
-        if (webcamTexture != null && webcamTexture.isPlaying)
+        canvasPreviewImage.gameObject.SetActive(false);
+        Mat baseImage = await GetBaseImageAsync();
+
+        if (baseImage == null)
         {
-            fullImage.gameObject.SetActive(false);
-            instructionText.gameObject.SetActive(false);
-            await Task.Delay(500);
-
-            Texture2D texture2D = TextureToTexture2D(webcamTexture);
-            Mat image = OpenCvSharp.Unity.TextureToMat(texture2D);
-            Mat baseImage = GetUndistortedCroppedImage(image, transformationMatrix, cameraMatrix, distortionCoefficients);
-
-            instructionText.gameObject.SetActive(true);
-
-            return baseImage;
+            Debug.LogError("Base image not found.");
+            return;
         }
 
-        return null;
+        CurrentCalibratorData.BaseImage = baseImage;
+        canvasPreviewImage.gameObject.SetActive(true);
+        Mat rotatedBaseImage = new();
+
+        canvasPreviewImage.texture = OpenCvSharp.Unity.MatToTexture(baseImage);
+        instructionText.gameObject.SetActive(true);
+        instructionText.text = "Base image set.\n\n" +
+                                "Press <b>Spacebar</b> to recalibrate the rectangle.\n" +
+                                "Press <b>B</b> to set a new base image based on the current found rectangle.\n" +
+                               "Press <b>Enter</b> to continue.";
+
+    }
+
+    // Gets an image of the cropped and distorted board without anything projected on it
+    public async Task<Mat> GetBaseImageAsync()
+    {
+        if (webcamTexture == null || !webcamTexture.isPlaying)
+        {
+            Debug.LogError("Webcam texture not found or not playing.");
+            return null;
+        }
+
+        if (transformationMatrix == null || cameraMatrix == null || distortionCoefficients == null)
+        {
+            Debug.LogError("Transformation matrix, camera matrix, or distortion coefficients not found.");
+            return null;
+        }
+
+        fullImage.gameObject.SetActive(false);
+        instructionText.gameObject.SetActive(false);
+        await Task.Delay(500);
+
+        // Texture2D texture2D = TextureToTexture2D(webcamTexture);
+        Mat image = OpenCvSharp.Unity.TextureToMat(webcamTexture);
+        Mat baseImage = GetUndistortedCroppedImage(image, transformationMatrix, cameraMatrix, distortionCoefficients);
+
+        return baseImage;
     }
 
     /// Detects corners in the given texture using OpenCV.

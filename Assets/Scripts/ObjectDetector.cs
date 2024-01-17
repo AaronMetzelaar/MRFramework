@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using OpenCvSharp;
@@ -16,7 +17,7 @@ public class ObjectDetector : MonoBehaviour
     [Tooltip("The threshold for the shape matching algorithm. The higher the value, the less sensitive the algorithm is to shape differences.")]
     [Range(0.0f, 1.0f)] public float objectMatchThreshold = 0.2f;
     [Tooltip("The interval in seconds between each object detection.")]
-    [Range(0.0f, 1.0f)] public float detectionInterval = 1f;
+    [Range(0.0f, 1.0f)] public float detectionInterval = 0.1f;
     [Tooltip("The margin in pixels between two detected objects. Increase this value if objects are detected multiple times or recreated too often.")]
     [Range(0.0f, 100.0f)] public float positionMargin = 10f;
     [Tooltip("The margin between the hues of the detected object and the initialized object. Increase this value if objects are detected multiple times or recreated too often.")]
@@ -66,6 +67,11 @@ public class ObjectDetector : MonoBehaviour
 
     public void StopDetecting()
     {
+        fullImage.gameObject.SetActive(true);
+        Mat diffImage = objectInitializer.SubtractImages(OpenCvSharp.Unity.TextureToMat(webCamTexture), calibratorData.BaseImage);
+        Mat transformedImage = objectInitializer.TransformImage(diffImage);
+        fullImage.texture = OpenCvSharp.Unity.MatToTexture(transformedImage);
+
         isDetecting = false;
         CancelInvoke(nameof(UpdateObjects));
 
@@ -82,13 +88,37 @@ public class ObjectDetector : MonoBehaviour
     /// </summary>
     private void UpdateObjects()
     {
+        // DelayedUpdateObjects();
+        StartCoroutine(RemovePreviousFrame());
+    }
+
+    private void DelayedUpdateObjects()
+    {
         if (!isDetecting) return;
 
         using Mat image = OpenCvSharp.Unity.TextureToMat(webCamTexture);
         using Mat undistortedCroppedImage = calibrator.GetUndistortedCroppedImage(image, calibratorData.TransformationMatrix, calibratorData.CameraMatrix, calibratorData.DistortionCoefficients);
-        using Mat transformedImage = objectInitializer.TransformImage(undistortedCroppedImage);
+        using Mat subtractedImage = objectInitializer.SubtractImages(undistortedCroppedImage, calibratorData.BaseImage);
+        using Mat transformedImage = objectInitializer.TransformImage(subtractedImage);
         List<DetectedObject> detectedObjects = FindObjects(transformedImage);
         ProcessDetectedObjects(detectedObjects, transformedImage);
+    }
+
+    private void RemoveAllActiveObjects()
+    {
+        foreach (var activeObject in activeObjects.Values)
+        {
+            if (activeObject != null)
+                Destroy(activeObject);
+        }
+        activeObjects.Clear();
+    }
+
+    IEnumerator RemovePreviousFrame()
+    {
+        RemoveAllActiveObjects();
+        yield return new WaitForEndOfFrame();
+        DelayedUpdateObjects();
     }
 
     /// <summary>
@@ -104,7 +134,7 @@ public class ObjectDetector : MonoBehaviour
 
         foreach (Point[] contour in contours.OrderByDescending(contour => Cv2.ContourArea(contour)))
         {
-            if (Cv2.ContourArea(contour) < smallestContourArea * 0.5)
+            if (Cv2.ContourArea(contour) < smallestContourArea * 0.2)
             {
                 break; // No more objects to detect
             }
@@ -114,22 +144,19 @@ public class ObjectDetector : MonoBehaviour
             foreach (InitializedObject initializedObject in initializedObjects)
             {
                 double matchShapeScore = Cv2.MatchShapes(contour, initializedObject.Contour, ShapeMatchModes.I2);
-                Debug.Log("Match score: " + matchShapeScore);
                 if (matchShapeScore > objectMatchThreshold || !AreHuesSimilar(hue, initializedObject.ColorHue))
                     continue;
 
                 Vector2 centroidInCanvasSpace = objectInitializer.CalculateAndConvertCentroid(contour, image, fullImage.rectTransform);
                 Point centroidPoint = new((int)centroidInCanvasSpace.x, (int)centroidInCanvasSpace.y);
-                RotatedRect minAreaRect = Cv2.MinAreaRect(contour);
-                float rotationAngle = minAreaRect.Angle;
+                float rotationAngle = GetRotationAngle(contour);
 
                 DetectedObject detectedObject = gameObject.AddComponent<DetectedObject>();
                 detectedObject.initializedObject = initializedObject;
                 detectedObject.centroidInCanvasSpace = centroidInCanvasSpace;
                 detectedObject.contour = contour;
-                // detectedObject.rotationAngle = rotationAngle;
+                detectedObject.rotationAngle = rotationAngle;
                 detectedObjects.Add(detectedObject);
-                Debug.Log("Object detected! Centroid: " + centroidInCanvasSpace.x + ", " + centroidInCanvasSpace.y + " Rotation angle: " + rotationAngle + " Hue: " + hue + " Match score: " + matchShapeScore);
             }
         }
 
@@ -159,7 +186,6 @@ public class ObjectDetector : MonoBehaviour
             {
                 Point[] normalizedContour = objectInitializer.NormalizeContour(detectedObject.contour, detectedObject.centroidInCanvasSpace, image.Width, image.Height);
                 GameObject gameObject = objectInitializer.VisualizeObject(normalizedContour, image, detectedObject.centroidInCanvasSpace, detectedObject.initializedObject.Color, true);
-                // gameObject.transform.localPosition = new Vector3(detectedObject.centroidInCanvasSpace.x, detectedObject.centroidInCanvasSpace.y, -0.01f);
                 activeObjects.Add(objectId, gameObject);
             }
         }
@@ -177,7 +203,6 @@ public class ObjectDetector : MonoBehaviour
         int positionHashX = Mathf.RoundToInt(detectedObject.centroidInCanvasSpace.x * (1f / positionMargin));
         int positionHashY = Mathf.RoundToInt(detectedObject.centroidInCanvasSpace.y * (1f / positionMargin));
         float sizeHash = Mathf.RoundToInt(detectedObject.initializedObject.Contour.Length * (1f / positionMargin));
-        Debug.Log("Position hashX: " + positionHashX + " Position hashY: " + positionHashY + " Size hash: " + sizeHash);
         return new DetectedValues { centroidInCanvasSpace = new Vector2(positionHashX, positionHashY), sizeHash = sizeHash };
     }
 
@@ -195,6 +220,7 @@ public class ObjectDetector : MonoBehaviour
     private void UpdateGameObject(GameObject gameObject, DetectedObject detectedObject)
     {
         gameObject.GetComponent<DetectedObject>().UpdatePosition(detectedObject.centroidInCanvasSpace);
+        gameObject.GetComponent<DetectedObject>().UpdateRotation(detectedObject.rotationAngle);
     }
 
     /// <summary>
@@ -213,6 +239,8 @@ public class ObjectDetector : MonoBehaviour
 
         foreach (var inactiveObjectId in inactiveObjectIds)
         {
+            Debug.Log($"Removing inactive object with id {inactiveObjectId}");
+            Destroy(activeObjects[inactiveObjectId]);
             activeObjects.Remove(inactiveObjectId);
         }
     }
@@ -235,6 +263,34 @@ public class ObjectDetector : MonoBehaviour
         }
 
         return smallestArea;
+    }
+
+    /// <summary>
+    /// Calculates the rotation angle of the given contour. The angle can be between 0 and 360 degrees.
+    /// </summary>
+    /// <param name="contour">The contour to calculate the rotation angle for.</param>
+    /// <returns>The rotation angle of the contour.</returns>
+
+    float GetRotationAngle(Point[] contour)
+    {
+        if (contour == null || contour.Length == 0)
+        {
+            return -1;
+        }
+
+        Moments moments = Cv2.Moments(contour);
+        Point2f centroid = new((float)(moments.M10 / moments.M00), (float)(moments.M01 / moments.M00));
+
+        Point2f furthestPoint = contour.OrderByDescending(point => Math.Sqrt(Math.Pow(point.X - centroid.X, 2) + Math.Pow(point.Y - centroid.Y, 2))).First();
+
+        float rotationAngle = Mathf.Atan2(furthestPoint.Y - centroid.Y, furthestPoint.X - centroid.X) * Mathf.Rad2Deg;
+
+        // Normalize the angle to be between 0 and 360 degrees
+        rotationAngle = (rotationAngle + 360) % 360;
+
+        Debug.Log($"Rotation angle: {rotationAngle}");
+
+        return rotationAngle;
     }
 
     bool AreHuesSimilar(float hue1, float hue2)

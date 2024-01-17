@@ -524,10 +524,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   fullImage: {fileID: 668560654}
   objectData: {fileID: 11400000, guid: decb7499f3955e949848fcf22ed12580, type: 2}
-  objectMatchThreshold: 0.353
+  objectMatchThreshold: 0.751
   detectionInterval: 0.5
-  positionMargin: 88.6
-  hueMargin: 10
+  positionMargin: 75
+  hueMargin: 59.2
 --- !u!1 &950920451
 GameObject:
   m_ObjectHideFlags: 0

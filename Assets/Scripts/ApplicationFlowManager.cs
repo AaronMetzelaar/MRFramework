@@ -50,6 +50,7 @@ public class ApplicationFlowManager : MonoBehaviour
                                "Also, make sure there is enough contrast between the playing field\n" +
                                "and the surface underneath.\n\n" +
                                "Press <b>Spacebar</b> to recalibrate.\n" +
+                               "Press <b>B</b> to set a base image based on the current found rectangle.\n" +
                                "Press <b>Enter</b> to continue.";
     }
 
@@ -64,6 +65,10 @@ public class ApplicationFlowManager : MonoBehaviour
                 if (Input.GetKeyDown(KeyCode.Space))
                 {
                     StartCoroutine(calibrator.Recalibrate());
+                }
+                if (Input.GetKeyDown(KeyCode.B))
+                {
+                    calibrator.SetBaseImage();
                 }
                 if (Input.GetKeyDown(KeyCode.Return))
                 {

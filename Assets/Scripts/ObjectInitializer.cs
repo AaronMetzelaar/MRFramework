@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Collections;
 using TMPro;
 using Unity.VisualScripting;
+using System.Threading.Tasks;
 public class ObjectInitializer : MonoBehaviour
 {
     private Calibrator calibrator;
@@ -90,7 +91,7 @@ public class ObjectInitializer : MonoBehaviour
     /// <summary>
     /// Captures an image, initiates an object, and visualizes it.
     /// </summary>
-    public void CaptureAndInitializeObject()
+    public async void CaptureAndInitializeObject()
     {
         if (calibrator.CurrentCalibratorData == null)
         {
@@ -111,7 +112,7 @@ public class ObjectInitializer : MonoBehaviour
         differenceImage = SubtractImages(calibratorData.BaseImage, undistortedCroppedImage);
         Mat grayImage = TransformImage(differenceImage);
         Point[] contour = FindContour(grayImage, undistortedCroppedImage);
-        fullImage.texture = OpenCvSharp.Unity.MatToTexture(grayImage);
+        // fullImage.texture = OpenCvSharp.Unity.MatToTexture(grayImage);
 
         if (contour == null)
         {
@@ -126,21 +127,26 @@ public class ObjectInitializer : MonoBehaviour
         }
 
         // This is needed to get the hue of the object with the Color projected on it
-        Mat newImage = OpenCvSharp.Unity.TextureToMat(webCamTexture);
+        // Mat newImage = OpenCvSharp.Unity.TextureToMat(webCamTexture);
+        Mat newImage = await GetImageFromWebcam();
+
         Mat newUndistortedCroppedImage = calibrator.GetUndistortedCroppedImage(newImage, calibratorData.TransformationMatrix, calibratorData.CameraMatrix, calibratorData.DistortionCoefficients);
 
         // contour = calibrator.UndistortPoints(contour, calibratorData.CameraMatrix, calibratorData.DistortionCoefficients);
 
         Vector2 centroidInCanvasSpace = CalculateAndConvertCentroid(contour, undistortedCroppedImage, fullImage.rectTransform);
-        RotatedRect minAreaRect = Cv2.MinAreaRect(contour);
+        // RotatedRect minAreaRect = Cv2.MinAreaRect(contour);
         // float rotationAngle = minAreaRect.Angle;
-        Debug.Log("centroidInCanvasSpace: " + centroidInCanvasSpace);
         initializedObject.Contour = NormalizeContour(contour, centroidInCanvasSpace, undistortedCroppedImage.Width, undistortedCroppedImage.Height);
-        Debug.Log("initializedObject.Contour: " + initializedObject.Contour);
         initializedObject.WhiteHue = GetObjectHue(undistortedCroppedImage, contour);
-        Debug.Log("initializedObject.WhiteHue: " + initializedObject.WhiteHue);
         initializedObject.ColorHue = GetObjectHue(newUndistortedCroppedImage, contour);
         initializedObject.Color = (objectColor == default) ? GetContrastingColor(initializedObject.WhiteHue) : objectColor;
+    }
+
+    public async Task<Mat> GetImageFromWebcam()
+    {
+        await Task.Delay(500);
+        return OpenCvSharp.Unity.TextureToMat(webCamTexture);
     }
 
     /// <summary>
@@ -238,7 +244,6 @@ public class ObjectInitializer : MonoBehaviour
             largestContour = Cv2.ConvexHull(largestContour);
 
         Vector2 centroidInCanvasSpace = CalculateAndConvertCentroid(largestContour, image, fullImage.rectTransform);
-        Debug.Log("centroidInCanvasSpace in FindContour: " + centroidInCanvasSpace);
         RotatedRect minAreaRect = Cv2.MinAreaRect(largestContour);
         float rotationAngle = minAreaRect.Angle;
         Color color = objectColor == default ? GetContrastingColor(initializedObject.WhiteHue) : objectColor;
@@ -339,7 +344,6 @@ public class ObjectInitializer : MonoBehaviour
         detectedObject.GetComponent<MeshRenderer>().material.color = color;
 
         currentVisualizedObject = detectedObject;
-        Debug.Log("Visualized object at: " + detectedObject.transform.localPosition);
 
         return detectedObject;
     }
