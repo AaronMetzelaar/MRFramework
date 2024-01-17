@@ -101,7 +101,7 @@ public class ApplicationFlowManager : MonoBehaviour
                         objectInitializer.Reinitiate();
                     }
                 }
-                if (Input.GetKeyDown(KeyCode.Return))
+                if (Input.GetKeyDown(KeyCode.Return) && objectInitializer.currentVisualizedObject != null)
                 {
                     objectInitializer.SaveObjectToList();
                     Destroy(objectInitializer.currentVisualizedObject);

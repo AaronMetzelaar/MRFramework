@@ -116,7 +116,14 @@ public class Calibrator : MonoBehaviour
             Point[] corners = DetectProjectionCorners(image); // Can't do detection of a rectangle on undistorted image because of curved edges
 
             if (corners == null)
+            {
+                instructionText.text = "No rectangle found.\n\n" +
+                                       "Make sure the entire playing field is visible.\n" +
+                                       "Also, make sure there is enough contrast between the playing field\n" +
+                                       "and the surface underneath.\n\n" +
+                                       "Press <b>Spacebar</b> to recalibrate.";
                 return;
+            }
 
             Mat transformationMatrix = GetTransformationMatrix(corners);
             Mat croppedImage = CropImage(image, corners);
@@ -141,7 +148,7 @@ public class Calibrator : MonoBehaviour
 
             canvasPreviewImage.gameObject.SetActive(true);
             canvasPreviewImage = RotateRawImage(canvasPreviewImage, cameraRotation);
-            canvasPreviewImage.texture = OpenCvSharp.Unity.MatToTexture(baseImage);
+            // canvasPreviewImage.texture = OpenCvSharp.Unity.MatToTexture(baseImage);
 
             // Save the calibration data
             CurrentCalibratorData = new CalibratorData(corners, transformationMatrix, cameraMatrix, distortionCoefficients, baseImage, cameraRotation);
@@ -245,7 +252,8 @@ public class Calibrator : MonoBehaviour
         }
         else
         {
-            canvasPreviewImage.texture = OpenCvSharp.Unity.MatToTexture(image);
+            canvasPreviewImage.texture = webcamTexture;
+            fullImage.gameObject.SetActive(false);
             Debug.LogError("No rectangle found.");
             return null;
         }
@@ -293,7 +301,7 @@ public class Calibrator : MonoBehaviour
             cameraMatrix = camMatrix;
             distortionCoefficients = distCoeffs;
 
-            // To see the undistorted image, uncomment the following lines
+            // To see the undistorted image, uncomment the following line
             // canvasPreviewImage.texture = OpenCvSharp.Unity.MatToTexture(undistortedImage);
         }
         else
@@ -366,6 +374,17 @@ public class Calibrator : MonoBehaviour
             rawImage.rectTransform.Rotate(0, 0, -180);
             isFlipped = true;
         }
+        else if (rotation == CameraRotationOption.MirroredHorizontally && !isFlipped)
+        {
+            rawImage.rectTransform.Rotate(0, 180, 0);
+            isFlipped = true;
+        }
+        else if (rotation == CameraRotationOption.MirroredBoth && !isFlipped)
+        {
+            rawImage.rectTransform.Rotate(0, 0, 180);
+            isFlipped = true;
+        }
+
         else if (rotation == CameraRotationOption.None && isFlipped)
         {
             rawImage.rectTransform.Rotate(0, 0, 180);
@@ -378,6 +397,11 @@ public class Calibrator : MonoBehaviour
     // Transform points using the camera matrix and distortion coefficients
     public Point[] UndistortPoints(Point[] points, Mat cameraMatrix, Mat distortionCoefficients)
     {
+        if (points == null)
+        {
+            Debug.LogError("Points array is null.");
+            return null;
+        }
         if (cameraMatrix == null || distortionCoefficients == null)
         {
             Debug.LogError("Camera matrix or distortion coefficients not found.");

@@ -16,7 +16,8 @@ public class DetectedObject : MonoBehaviour
 
     public void UpdatePosition(Vector2 centroidInCanvasSpace)
     {
-        transform.position = centroidInCanvasSpace;
+        // TODO FIX
+        transform.localPosition = new(centroidInCanvasSpace.x, centroidInCanvasSpace.y, -0.01f);
     }
 
     public void UpdateRotation(float rotation)

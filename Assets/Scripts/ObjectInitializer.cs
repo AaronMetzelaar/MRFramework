@@ -73,7 +73,7 @@ public class ObjectInitializer : MonoBehaviour
         if (initializedObject != null)
         {
             initializedObject.Contour = null;
-            initializedObject.ObjectHue = 0f;
+            initializedObject.WhiteHue = 0f;
             initializedObject.Color = Color.clear;
         }
 
@@ -100,19 +100,47 @@ public class ObjectInitializer : MonoBehaviour
 
         initializedObject = new InitializedObject();
 
-        if (fullImage.gameObject.activeSelf == false) fullImage.gameObject.SetActive(true);
+        if (fullImage.gameObject.activeSelf == false)
+        {
+            fullImage.gameObject.SetActive(true);
+            fullImage.texture = null;
+        }
 
         Mat image = OpenCvSharp.Unity.TextureToMat(webCamTexture);
         Mat undistortedCroppedImage = calibrator.GetUndistortedCroppedImage(image, calibratorData.TransformationMatrix, calibratorData.CameraMatrix, calibratorData.DistortionCoefficients);
         differenceImage = SubtractImages(calibratorData.BaseImage, undistortedCroppedImage);
         Mat grayImage = TransformImage(differenceImage);
         Point[] contour = FindContour(grayImage, undistortedCroppedImage);
-        Vector2 centroidInCanvasSpace = CalculateAndConvertCentroid(contour, image, fullImage.rectTransform);
+        fullImage.texture = OpenCvSharp.Unity.MatToTexture(grayImage);
+
+        if (contour == null)
+        {
+            instructionText.gameObject.SetActive(true);
+            instructionText.text = "No object detected.\n\n" +
+                                    "Place your object in the center of the canvas.\n" +
+                                    "Make sure only the object is new in the scene and that the background\n" +
+                                    "is the same as the background used for calibration.\n\n" +
+                                   "Press <b>Spacebar</b> to reinitialize.";
+            Debug.LogError("Contour not found.");
+            return;
+        }
+
+        // This is needed to get the hue of the object with the Color projected on it
+        Mat newImage = OpenCvSharp.Unity.TextureToMat(webCamTexture);
+        Mat newUndistortedCroppedImage = calibrator.GetUndistortedCroppedImage(newImage, calibratorData.TransformationMatrix, calibratorData.CameraMatrix, calibratorData.DistortionCoefficients);
+
+        // contour = calibrator.UndistortPoints(contour, calibratorData.CameraMatrix, calibratorData.DistortionCoefficients);
+
+        Vector2 centroidInCanvasSpace = CalculateAndConvertCentroid(contour, undistortedCroppedImage, fullImage.rectTransform);
         RotatedRect minAreaRect = Cv2.MinAreaRect(contour);
         // float rotationAngle = minAreaRect.Angle;
-        initializedObject.Contour = NormalizeContour(contour, centroidInCanvasSpace, image.Width, image.Height);
-        initializedObject.ObjectHue = GetObjectHue(undistortedCroppedImage, initializedObject.Contour, undistortedCroppedImage);
-        initializedObject.Color = (objectColor == default) ? GetContrastingColor(initializedObject.ObjectHue) : objectColor;
+        Debug.Log("centroidInCanvasSpace: " + centroidInCanvasSpace);
+        initializedObject.Contour = NormalizeContour(contour, centroidInCanvasSpace, undistortedCroppedImage.Width, undistortedCroppedImage.Height);
+        Debug.Log("initializedObject.Contour: " + initializedObject.Contour);
+        initializedObject.WhiteHue = GetObjectHue(undistortedCroppedImage, contour);
+        Debug.Log("initializedObject.WhiteHue: " + initializedObject.WhiteHue);
+        initializedObject.ColorHue = GetObjectHue(newUndistortedCroppedImage, contour);
+        initializedObject.Color = (objectColor == default) ? GetContrastingColor(initializedObject.WhiteHue) : objectColor;
     }
 
     /// <summary>
@@ -183,7 +211,10 @@ public class ObjectInitializer : MonoBehaviour
         Cv2.FindContours(thresholdImage, out Point[][] contours, out _, RetrievalModes.External, ContourApproximationModes.ApproxSimple);
 
         if (contours.Length == 0)
+        {
             Debug.LogError("No contours found.");
+            return null;
+        }
 
         // Find the largest contour by area
         Point[] largestContour = contours.OrderByDescending(c => Cv2.ContourArea(c)).First();
@@ -194,19 +225,23 @@ public class ObjectInitializer : MonoBehaviour
         double area = Cv2.ContourArea(largestContour);
         double canvasArea = fullImage.rectTransform.rect.width * fullImage.rectTransform.rect.height;
         double maxArea = canvasArea * 0.5;
-        double minArea = canvasArea * 0.01;
+        double minArea = canvasArea * 0.005;
 
         if (area < minArea || area > maxArea)
+        {
             Debug.LogError("Contour area is too small or too large.");
+            return null;
+        }
 
         // If the contour consists of multiple contours, merge them into one using the convex hull algorithm
         if (largestContour.Length > 1)
             largestContour = Cv2.ConvexHull(largestContour);
 
         Vector2 centroidInCanvasSpace = CalculateAndConvertCentroid(largestContour, image, fullImage.rectTransform);
+        Debug.Log("centroidInCanvasSpace in FindContour: " + centroidInCanvasSpace);
         RotatedRect minAreaRect = Cv2.MinAreaRect(largestContour);
         float rotationAngle = minAreaRect.Angle;
-        Color color = objectColor == default ? GetContrastingColor(initializedObject.ObjectHue) : objectColor;
+        Color color = objectColor == default ? GetContrastingColor(initializedObject.WhiteHue) : objectColor;
         Point[] normalizedContour = NormalizeContour(largestContour, centroidInCanvasSpace, image.Width, image.Height);
         VisualizeObject(normalizedContour, image, centroidInCanvasSpace, color);
 
@@ -215,29 +250,21 @@ public class ObjectInitializer : MonoBehaviour
 
     /// <summary>
     /// Get the hue of the object by calculating the hue of the pixel at the center of
-    /// the object and subtracting the hue of what's being projected on the object.
+    /// the object.
     /// </summary>
     /// <param name="image">The image in which the object is detected.</param>
     /// <param name="contour">The contour of the detected object.</param>
-    /// <param name="canvas">The image used for projection.</param>
     /// <returns>The color of the detected object.</returns>
-    public float GetObjectHue(Mat image, Point[] contour, Mat canvas)
+    public float GetObjectHue(Mat image, Point[] contour)
     {
         Moments moments = Cv2.Moments(contour);
         int centerX = (int)(moments.M10 / moments.M00);
         int centerY = (int)(moments.M01 / moments.M00);
 
-        Vec3b imageColor = image.Get<Vec3b>(centerY, centerX);
-        Vec3b canvasColor = canvas.Get<Vec3b>(centerY, centerX);
+        Vec3b pixel = image.Get<Vec3b>(centerY, centerX);
+        Vector3 rgb = new(pixel.Item2, pixel.Item1, pixel.Item0);
+        float hue = RgbToHue(rgb);
 
-
-        Vector3 imageColorVector = new(imageColor.Item0, imageColor.Item1, imageColor.Item2);
-        Vector3 canvasColorVector = new(canvasColor.Item0, canvasColor.Item1, canvasColor.Item2);
-
-        float imageHue = RgbToHue(imageColorVector);
-        float canvasHue = RgbToHue(canvasColorVector);
-
-        float hue = imageHue - canvasHue;
         return hue;
     }
 
@@ -297,7 +324,8 @@ public class ObjectInitializer : MonoBehaviour
         // image = DrawContour(image, contour);
         // fullImage.texture = OpenCvSharp.Unity.MatToTexture(image);
 
-        GameObject detectedObject = Instantiate(prefabMaterialEmpty, canvasPos);
+        GameObject detectedObject = Instantiate(prefabMaterialEmpty, new Vector3(centroidInCanvasSpace.x, centroidInCanvasSpace.y, -0.01f), Quaternion.identity);
+        detectedObject.transform.SetParent(canvasPos, false);
 
         if (detectedObject.TryGetComponent(out MeshFilter meshFilter))
             meshFilter.mesh = CreateMeshFromContour(contour, centroidInCanvasSpace);
@@ -306,11 +334,12 @@ public class ObjectInitializer : MonoBehaviour
 
         if (!isInitializedObject)
         {
-            detectedObject.transform.localPosition = new Vector3(centroidInCanvasSpace.x, centroidInCanvasSpace.y, -0.01f); // negative z to render in front of the image
+            // detectedObject.transform.localPosition = new(centroidInCanvasSpace.x, centroidInCanvasSpace.y, -0.01f); // negative z to render in front of the image
         }
         detectedObject.GetComponent<MeshRenderer>().material.color = color;
 
         currentVisualizedObject = detectedObject;
+        Debug.Log("Visualized object at: " + detectedObject.transform.localPosition);
 
         return detectedObject;
     }
@@ -325,7 +354,6 @@ public class ObjectInitializer : MonoBehaviour
     /// <returns>The created mesh.</returns>
     public Mesh CreateMeshFromContour(Point[] contour, Vector3 canvasCentroid)
     {
-        Debug.Log("canvas centroid: " + canvasCentroid.x + ", " + canvasCentroid.y);
         Point canvasCentroidPoint = new((int)canvasCentroid.x, (int)canvasCentroid.y);
         // contour = NormalizeContour(contour, canvasCentroidPoint, rotationAngle);
         Vector3[] vertices = contour.Select(point => new Vector3(point.X, point.Y, 0)).ToArray();

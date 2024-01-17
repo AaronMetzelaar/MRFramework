@@ -54,7 +54,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 10302, guid: 0000000000000000f000000000000000, type: 0}
+  - {fileID: 2100000, guid: 8b6de685162c3134e90fa4b1d74baf5e, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -96,4 +96,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6ab63c2ff65076442a3955e556459bef, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  initializedObject:
+    WhiteHue: 0
+    ColorHue: 0
+    Color: {r: 0, g: 0, b: 0, a: 0}
+    Contour: []
   centroidInCanvasSpace: {x: 0, y: 0}
+  contour: []

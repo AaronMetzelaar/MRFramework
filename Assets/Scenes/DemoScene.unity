@@ -492,7 +492,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   objectData: {fileID: 11400000, guid: decb7499f3955e949848fcf22ed12580, type: 2}
   instructionText: {fileID: 384782496}
-  canvasPreviewImage: {fileID: 0}
+  canvasPreviewImage: {fileID: 1758758653}
   fullImage: {fileID: 668560654}
   saveObjectData: 0
 --- !u!4 &779092895
@@ -527,6 +527,7 @@ MonoBehaviour:
   objectMatchThreshold: 0.353
   detectionInterval: 0.5
   positionMargin: 88.6
+  hueMargin: 10
 --- !u!1 &950920451
 GameObject:
   m_ObjectHideFlags: 0

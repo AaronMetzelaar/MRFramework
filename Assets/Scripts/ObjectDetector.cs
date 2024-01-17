@@ -16,9 +16,11 @@ public class ObjectDetector : MonoBehaviour
     [Tooltip("The threshold for the shape matching algorithm. The higher the value, the less sensitive the algorithm is to shape differences.")]
     [Range(0.0f, 1.0f)] public float objectMatchThreshold = 0.2f;
     [Tooltip("The interval in seconds between each object detection.")]
-    [Range(0.0f, 1.0f)] public float detectionInterval = 0.1f;
+    [Range(0.0f, 1.0f)] public float detectionInterval = 1f;
     [Tooltip("The margin in pixels between two detected objects. Increase this value if objects are detected multiple times or recreated too often.")]
     [Range(0.0f, 100.0f)] public float positionMargin = 10f;
+    [Tooltip("The margin between the hues of the detected object and the initialized object. Increase this value if objects are detected multiple times or recreated too often.")]
+    [Range(0.0f, 100.0f)] public float hueMargin = 50f;
 
     private bool isDetecting = false;
     private InitializedObject[] initializedObjects;
@@ -85,11 +87,9 @@ public class ObjectDetector : MonoBehaviour
         using Mat image = OpenCvSharp.Unity.TextureToMat(webCamTexture);
         using Mat undistortedCroppedImage = calibrator.GetUndistortedCroppedImage(image, calibratorData.TransformationMatrix, calibratorData.CameraMatrix, calibratorData.DistortionCoefficients);
         using Mat transformedImage = objectInitializer.TransformImage(undistortedCroppedImage);
-        fullImage.texture = OpenCvSharp.Unity.MatToTexture(transformedImage);
         List<DetectedObject> detectedObjects = FindObjects(transformedImage);
         ProcessDetectedObjects(detectedObjects, transformedImage);
     }
-
 
     /// <summary>
     /// Finds objects in the given image using contour detection and shape matching.
@@ -109,27 +109,27 @@ public class ObjectDetector : MonoBehaviour
                 break; // No more objects to detect
             }
 
-            float hue = objectInitializer.GetObjectHue(image, contour, image);
+            float hue = objectInitializer.GetObjectHue(image, contour);
 
             foreach (InitializedObject initializedObject in initializedObjects)
             {
                 double matchShapeScore = Cv2.MatchShapes(contour, initializedObject.Contour, ShapeMatchModes.I2);
                 Debug.Log("Match score: " + matchShapeScore);
-                if (matchShapeScore < objectMatchThreshold)
-                {
-                    Vector2 centroidInCanvasSpace = objectInitializer.CalculateAndConvertCentroid(contour, image, fullImage.rectTransform);
-                    Point centroidPoint = new((int)centroidInCanvasSpace.x, (int)centroidInCanvasSpace.y);
-                    RotatedRect minAreaRect = Cv2.MinAreaRect(contour);
-                    float rotationAngle = minAreaRect.Angle;
+                if (matchShapeScore > objectMatchThreshold || !AreHuesSimilar(hue, initializedObject.ColorHue))
+                    continue;
 
-                    DetectedObject detectedObject = gameObject.AddComponent<DetectedObject>();
-                    detectedObject.initializedObject = initializedObject;
-                    detectedObject.centroidInCanvasSpace = centroidInCanvasSpace;
-                    detectedObject.contour = contour;
-                    // detectedObject.rotationAngle = rotationAngle;
-                    detectedObjects.Add(detectedObject);
-                    Debug.Log("Object detected! Centroid: " + centroidInCanvasSpace.x + ", " + centroidInCanvasSpace.y + " Rotation angle: " + rotationAngle + " Hue: " + hue + " Match score: " + matchShapeScore);
-                }
+                Vector2 centroidInCanvasSpace = objectInitializer.CalculateAndConvertCentroid(contour, image, fullImage.rectTransform);
+                Point centroidPoint = new((int)centroidInCanvasSpace.x, (int)centroidInCanvasSpace.y);
+                RotatedRect minAreaRect = Cv2.MinAreaRect(contour);
+                float rotationAngle = minAreaRect.Angle;
+
+                DetectedObject detectedObject = gameObject.AddComponent<DetectedObject>();
+                detectedObject.initializedObject = initializedObject;
+                detectedObject.centroidInCanvasSpace = centroidInCanvasSpace;
+                detectedObject.contour = contour;
+                // detectedObject.rotationAngle = rotationAngle;
+                detectedObjects.Add(detectedObject);
+                Debug.Log("Object detected! Centroid: " + centroidInCanvasSpace.x + ", " + centroidInCanvasSpace.y + " Rotation angle: " + rotationAngle + " Hue: " + hue + " Match score: " + matchShapeScore);
             }
         }
 
@@ -150,17 +150,16 @@ public class ObjectDetector : MonoBehaviour
                 continue;
             }
             var objectId = GetObjectId(detectedObject);
-            Debug.Log("Object ID: " + objectId);
 
             if (activeObjects.ContainsKey(objectId))
             {
-                // UpdateGameObject(activeObjects[objectId], detectedObject);
+                UpdateGameObject(activeObjects[objectId], detectedObject);
             }
             else
             {
                 Point[] normalizedContour = objectInitializer.NormalizeContour(detectedObject.contour, detectedObject.centroidInCanvasSpace, image.Width, image.Height);
                 GameObject gameObject = objectInitializer.VisualizeObject(normalizedContour, image, detectedObject.centroidInCanvasSpace, detectedObject.initializedObject.Color, true);
-                gameObject.transform.localPosition = new Vector3(detectedObject.centroidInCanvasSpace.x, detectedObject.centroidInCanvasSpace.y, 0);
+                // gameObject.transform.localPosition = new Vector3(detectedObject.centroidInCanvasSpace.x, detectedObject.centroidInCanvasSpace.y, -0.01f);
                 activeObjects.Add(objectId, gameObject);
             }
         }
@@ -236,5 +235,11 @@ public class ObjectDetector : MonoBehaviour
         }
 
         return smallestArea;
+    }
+
+    bool AreHuesSimilar(float hue1, float hue2)
+    {
+        float hueDifference = Mathf.Abs(hue1 - hue2);
+        return hueDifference < hueMargin;
     }
 }
