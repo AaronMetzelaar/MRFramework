@@ -13,4 +13,6 @@ public class InitializedObject
     public Color Color;
     // Contour of the object
     public Point[] Contour;
+    // Name of the object, defaults to "Object"
+    public string Name = "Object";
 }

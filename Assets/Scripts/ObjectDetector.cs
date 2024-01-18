@@ -11,6 +11,7 @@ public class ObjectDetector : MonoBehaviour
     private Calibrator calibrator;
     private CalibratorData calibratorData;
     private ObjectInitializer objectInitializer;
+    private ObjectStateManager objectStateManager;
     [NonSerialized] public WebCamTexture webCamTexture;
     [SerializeField] private RawImage fullImage;
     [SerializeField] private ObjectData objectData;
@@ -40,6 +41,10 @@ public class ObjectDetector : MonoBehaviour
         if (!TryGetComponent(out objectInitializer))
         {
             Debug.LogError("ObjectInitializer not found in the scene.");
+        }
+        if (!TryGetComponent(out objectStateManager))
+        {
+            Debug.LogError("ObjectStateManager not found in the scene.");
         }
         if (webCamTexture == null)
         {
@@ -121,6 +126,11 @@ public class ObjectDetector : MonoBehaviour
         DelayedUpdateObjects();
     }
 
+    public List<DetectedObject> GetDetectedObjects()
+    {
+        return activeObjects.Values.Select(go => go.GetComponent<DetectedObject>()).ToList();
+    }
+
     /// <summary>
     /// Finds objects in the given image using contour detection and shape matching.
     /// </summary>
@@ -187,6 +197,7 @@ public class ObjectDetector : MonoBehaviour
                 Point[] normalizedContour = objectInitializer.NormalizeContour(detectedObject.contour, detectedObject.centroidInCanvasSpace, image.Width, image.Height);
                 GameObject gameObject = objectInitializer.VisualizeObject(normalizedContour, image, detectedObject.centroidInCanvasSpace, detectedObject.initializedObject.Color, true);
                 activeObjects.Add(objectId, gameObject);
+                objectStateManager.RegisterObject(gameObject.GetComponent<DetectedObject>());
             }
         }
 
@@ -242,6 +253,7 @@ public class ObjectDetector : MonoBehaviour
             Debug.Log($"Removing inactive object with id {inactiveObjectId}");
             Destroy(activeObjects[inactiveObjectId]);
             activeObjects.Remove(inactiveObjectId);
+            objectStateManager.UnregisterObject(activeObjects[inactiveObjectId].GetComponent<DetectedObject>());
         }
     }
 

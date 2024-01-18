@@ -8,13 +8,15 @@ public class ApplicationFlowManager : MonoBehaviour
     enum AppState
     {
         Calibration,
-        Initiation,
+        Initialization,
         Simulation
     }
 
     [NonSerialized] private Calibrator calibrator;
     [NonSerialized] private ObjectInitializer objectInitializer;
-    [NonSerialized] public ObjectDetector objectDetector;
+    [NonSerialized] private ObjectDetector objectDetector;
+    [Tooltip("The simulation file to load. This file should have a list of objects to be initialized.")]
+    [NonSerialized] private RGBDemoSimulation simulation;
     [SerializeField] private ObjectData objectData;
     [SerializeField] private TextMeshProUGUI instructionText;
     [SerializeField] private RawImage canvasPreviewImage;
@@ -22,7 +24,8 @@ public class ApplicationFlowManager : MonoBehaviour
     [Tooltip("Enable this to save the initialized object data between sessions, skipping the initiation step.")]
     [SerializeField] public bool saveObjectData = false;
     private AppState currentState = AppState.Calibration;
-    private bool firstInitiation = true;
+    private bool firstInitialization = true;
+    private int objectsToInitializeIndex = 0;
 
     /// <summary>
     /// This method is called when the script instance is being loaded.
@@ -44,6 +47,11 @@ public class ApplicationFlowManager : MonoBehaviour
         if (!TryGetComponent(out objectDetector))
         {
             Debug.LogError("ObjectDetector not found in the scene.");
+        }
+
+        if (!TryGetComponent(out simulation))
+        {
+            Debug.LogError("Simulation not found in the scene.");
         }
 
         instructionText.text = "If the border is incorrect, make sure the entire playing field is visible.\n" +
@@ -83,36 +91,54 @@ public class ApplicationFlowManager : MonoBehaviour
                     }
                     else
                     {
-                        currentState = AppState.Initiation;
+                        currentState = AppState.Initialization;
                         objectInitializer.Initialize();
-                        instructionText.text = "Place your object in the center of the canvas.\n\n" +
+                        objectInitializer.InitializeNamedObject(simulation.objectsToInitialize[0].Item1, simulation.objectsToInitialize[0].Item2);
+                        instructionText.text = $"Place the <b>{simulation.objectsToInitialize[0].Item1}</b> object in the center of the canvas.\n\n" +
                                                "Press <b>Spacebar</b> to initiate object detection.\n";
                     }
                 }
                 break;
-            case AppState.Initiation:
+            case AppState.Initialization:
                 if (Input.GetKeyDown(KeyCode.Space))
                 {
-                    if (firstInitiation)
+                    if (firstInitialization)
                     {
-                        firstInitiation = false;
-                        StartCoroutine(objectInitializer.DelayedInitiate());
+                        firstInitialization = false;
+                        StartCoroutine(objectInitializer.DelayedIntialize());
                         instructionText.text = "To change the color of the object, go to ApplicationManager > Object Initializer > Object Color.\n\n" +
                                                "Press <b>Spacebar</b> to reinitialize.\n" +
                                                "Press <b>Enter</b> to save the object and continue.";
                     }
                     else
                     {
-                        objectInitializer.Reinitiate();
+                        objectInitializer.Reinitialize();
                     }
                 }
                 if (Input.GetKeyDown(KeyCode.Return) && objectInitializer.currentVisualizedObject != null)
                 {
-                    objectInitializer.SaveObjectToList();
-                    Destroy(objectInitializer.currentVisualizedObject);
-                    fullImage.texture = null;
-                    currentState = AppState.Simulation;
-                    instructionText.text = "Press <b>Spacebar</b> to initiate object detection.";
+                    objectsToInitializeIndex++;
+                    if (objectInitializer.currentVisualizedObject != null)
+                    {
+
+                        objectInitializer.SaveObjectToList();
+                        Destroy(objectInitializer.currentVisualizedObject);
+                    }
+
+                    if (simulation.objectsToInitialize.Count - 1 > objectsToInitializeIndex)
+                    {
+                        objectInitializer.InitializeNamedObject(simulation.objectsToInitialize[objectsToInitializeIndex].Item1, simulation.objectsToInitialize[objectsToInitializeIndex].Item2);
+                        instructionText.text = $"Place the <b>{simulation.objectsToInitialize[objectsToInitializeIndex].Item1}</b> object in the center of the canvas.\n\n" +
+                       "Press <b>Spacebar</b> to reinitialize.\n" +
+                       "Press <b>Enter</b> to save the object and continue.";
+                    }
+                    // fullImage.texture = null; 
+                    else
+                    {
+                        currentState = AppState.Simulation;
+                        simulation.Initialize();
+                        instructionText.text = "Press <b>Spacebar</b> to initiate object detection.";
+                    }
                 }
                 break;
             case AppState.Simulation:

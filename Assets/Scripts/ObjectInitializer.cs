@@ -6,8 +6,8 @@ using UnityEngine.UI;
 using System.Collections.Generic;
 using System.Collections;
 using TMPro;
-using Unity.VisualScripting;
 using System.Threading.Tasks;
+
 public class ObjectInitializer : MonoBehaviour
 {
     private Calibrator calibrator;
@@ -19,7 +19,7 @@ public class ObjectInitializer : MonoBehaviour
     [SerializeField] private GameObject prefabMaterialEmpty;
     [SerializeField] private ObjectData objectData;
     [SerializeField] private TextMeshProUGUI instructionText;
-    [SerializeField] private Color objectColor = default;
+    [SerializeField] public Color objectColor = default;
 
     InitializedObject initializedObject = new();
     Mat differenceImage;
@@ -51,10 +51,12 @@ public class ObjectInitializer : MonoBehaviour
     /// Coroutine that delays the initiation of an object.
     /// </summary>
     /// <returns>An IEnumerator used for coroutine execution.</returns>
-    public IEnumerator DelayedInitiate()
+    public IEnumerator DelayedIntialize()
     {
         instructionText.gameObject.SetActive(false);
+        initializedObject = new InitializedObject();
         yield return new WaitForSeconds(0.2f);
+
         CaptureAndInitializeObject();
         yield return new WaitForSeconds(0.2f);
         instructionText.gameObject.SetActive(true);
@@ -65,18 +67,20 @@ public class ObjectInitializer : MonoBehaviour
     /// Disposes of various images and kernel used in the initialization process.
     /// Initiates the object after a delay.
     /// </summary>
-    public void Reinitiate()
+    public void Reinitialize()
     {
         if (currentVisualizedObject != null)
         {
             Destroy(currentVisualizedObject);
         }
-        if (initializedObject != null)
-        {
-            initializedObject.Contour = null;
-            initializedObject.WhiteHue = 0f;
-            initializedObject.Color = Color.clear;
-        }
+        // if (initializedObject != null)
+        // {
+        //     initializedObject.Contour = null;
+        //     initializedObject.WhiteHue = 0f;
+        //     initializedObject.Color = Color.clear;
+        //     initializedObject.ColorHue = 0f;
+        //     initializedObject.Name = "Object";
+        // }
 
         fullImage.texture = null;
         differenceImage?.Dispose();
@@ -85,7 +89,18 @@ public class ObjectInitializer : MonoBehaviour
         cannyImage?.Dispose();
         kernel?.Dispose();
 
-        StartCoroutine(DelayedInitiate());
+        StartCoroutine(DelayedIntialize());
+    }
+
+    public void InitializeNamedObject(string objectName, Color color)
+    {
+        initializedObject = new()
+        {
+            Color = color,
+            Name = objectName
+        };
+
+        objectColor = color;
     }
 
     /// <summary>
@@ -98,8 +113,6 @@ public class ObjectInitializer : MonoBehaviour
             Debug.LogError("Calibrator data is not available. Please calibrate first.");
             return;
         }
-
-        initializedObject = new InitializedObject();
 
         if (fullImage.gameObject.activeSelf == false)
         {
