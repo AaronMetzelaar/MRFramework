@@ -125,7 +125,7 @@ public class ApplicationFlowManager : MonoBehaviour
                         Destroy(objectInitializer.currentVisualizedObject);
                     }
 
-                    if (simulation.objectsToInitialize.Count - 1 > objectsToInitializeIndex)
+                    if (simulation.objectsToInitialize.Count - 1 >= objectsToInitializeIndex)
                     {
                         objectInitializer.InitializeNamedObject(simulation.objectsToInitialize[objectsToInitializeIndex].Item1, simulation.objectsToInitialize[objectsToInitializeIndex].Item2);
                         instructionText.text = $"Place the <b>{simulation.objectsToInitialize[objectsToInitializeIndex].Item1}</b> object in the center of the canvas.\n\n" +
@@ -136,7 +136,6 @@ public class ApplicationFlowManager : MonoBehaviour
                     else
                     {
                         currentState = AppState.Simulation;
-                        simulation.Initialize();
                         instructionText.text = "Press <b>Spacebar</b> to initiate object detection.";
                     }
                 }
@@ -147,6 +146,7 @@ public class ApplicationFlowManager : MonoBehaviour
                     objectDetector.webCamTexture = calibrator.webcamTexture;
                     instructionText.text = null;
                     objectDetector.Initialize();
+                    simulation.Initialize();
                     objectDetector.StartDetecting();
                 }
                 if (Input.GetKeyDown(KeyCode.Return))

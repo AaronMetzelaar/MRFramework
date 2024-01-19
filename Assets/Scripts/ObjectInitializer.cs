@@ -140,17 +140,12 @@ public class ObjectInitializer : MonoBehaviour
         }
 
         // This is needed to get the hue of the object with the Color projected on it
-        // Mat newImage = OpenCvSharp.Unity.TextureToMat(webCamTexture);
         Mat newImage = await GetImageFromWebcam();
-
         Mat newUndistortedCroppedImage = calibrator.GetUndistortedCroppedImage(newImage, calibratorData.TransformationMatrix, calibratorData.CameraMatrix, calibratorData.DistortionCoefficients);
 
-        // contour = calibrator.UndistortPoints(contour, calibratorData.CameraMatrix, calibratorData.DistortionCoefficients);
-
         Vector2 centroidInCanvasSpace = CalculateAndConvertCentroid(contour, undistortedCroppedImage, fullImage.rectTransform);
-        // RotatedRect minAreaRect = Cv2.MinAreaRect(contour);
-        // float rotationAngle = minAreaRect.Angle;
-        initializedObject.Contour = NormalizeContour(contour, centroidInCanvasSpace, undistortedCroppedImage.Width, undistortedCroppedImage.Height);
+        float rotationAngle = GetRotationAngle(contour);
+        initializedObject.Contour = NormalizeContour(contour, centroidInCanvasSpace, Screen.width, Screen.height, rotationAngle);
         initializedObject.WhiteHue = GetObjectHue(undistortedCroppedImage, contour);
         initializedObject.ColorHue = GetObjectHue(newUndistortedCroppedImage, contour);
         initializedObject.Color = (objectColor == default) ? GetContrastingColor(initializedObject.WhiteHue) : objectColor;
@@ -257,11 +252,11 @@ public class ObjectInitializer : MonoBehaviour
             largestContour = Cv2.ConvexHull(largestContour);
 
         Vector2 centroidInCanvasSpace = CalculateAndConvertCentroid(largestContour, image, fullImage.rectTransform);
-        RotatedRect minAreaRect = Cv2.MinAreaRect(largestContour);
-        float rotationAngle = minAreaRect.Angle;
+        float rotationAngle = GetRotationAngle(largestContour);
         Color color = objectColor == default ? GetContrastingColor(initializedObject.WhiteHue) : objectColor;
-        Point[] normalizedContour = NormalizeContour(largestContour, centroidInCanvasSpace, image.Width, image.Height);
-        VisualizeObject(normalizedContour, image, centroidInCanvasSpace, color);
+        Point[] normalizedContour = NormalizeContour(largestContour, centroidInCanvasSpace, Screen.width, Screen.height, rotationAngle);
+        GameObject initializedGameObject = VisualizeObject(normalizedContour, image, centroidInCanvasSpace, rotationAngle, color);
+        // initializedGameObject.transform.localRotation = Quaternion.Euler(0, 0, rotationAngle);
 
         return largestContour;
     }
@@ -332,11 +327,37 @@ public class ObjectInitializer : MonoBehaviour
     }
 
     /// <summary>
+    /// Calculates the rotation angle of the given contour. The angle can be between 0 and 360 degrees.
+    /// </summary>
+    /// <param name="contour">The contour to calculate the rotation angle for.</param>
+    /// <returns>The rotation angle of the contour.</returns>
+
+    public float GetRotationAngle(Point[] contour)
+    {
+        if (contour == null || contour.Length == 0)
+        {
+            return -1;
+        }
+
+        Moments moments = Cv2.Moments(contour);
+        Point2f centroid = new((float)(moments.M10 / moments.M00), (float)(moments.M01 / moments.M00));
+
+        Point2f furthestPoint = contour.OrderByDescending(point => Math.Sqrt(Math.Pow(point.X - centroid.X, 2) + Math.Pow(point.Y - centroid.Y, 2))).First();
+
+        float rotationAngle = Mathf.Atan2(furthestPoint.Y - centroid.Y, furthestPoint.X - centroid.X) * Mathf.Rad2Deg;
+
+        // Normalize the angle to be between 0 and 360 degrees
+        rotationAngle = (rotationAngle + 360) % 360;
+
+        return rotationAngle;
+    }
+
+    /// <summary>
     /// Visualizes the initiated object by instantiating a game object and setting its position and mesh based on the initiated object's properties.
     /// </summary>
     /// <param name="contour">The contour of the initiated object. This must be normalized beforehand.</param>
     /// <param name="image">The image used for visualization.</param>
-    public GameObject VisualizeObject(Point[] contour, Mat image, Vector2 centroidInCanvasSpace, Color color = default, bool isInitializedObject = false)
+    public GameObject VisualizeObject(Point[] contour, Mat image, Vector2 centroidInCanvasSpace, float rotationAngle, Color color = default)
     {
         // Uncomment the following lines to draw the contour on the image
         // image = DrawContour(image, contour);
@@ -349,12 +370,8 @@ public class ObjectInitializer : MonoBehaviour
             meshFilter.mesh = CreateMeshFromContour(contour, centroidInCanvasSpace);
         else
             Debug.LogError("Material not found.");
-
-        if (!isInitializedObject)
-        {
-            // detectedObject.transform.localPosition = new(centroidInCanvasSpace.x, centroidInCanvasSpace.y, -0.01f); // negative z to render in front of the image
-        }
         detectedObject.GetComponent<MeshRenderer>().material.color = color;
+        detectedObject.transform.localRotation = Quaternion.Euler(0, 0, rotationAngle);
 
         currentVisualizedObject = detectedObject;
 
@@ -372,7 +389,6 @@ public class ObjectInitializer : MonoBehaviour
     public Mesh CreateMeshFromContour(Point[] contour, Vector3 canvasCentroid)
     {
         Point canvasCentroidPoint = new((int)canvasCentroid.x, (int)canvasCentroid.y);
-        // contour = NormalizeContour(contour, canvasCentroidPoint, rotationAngle);
         Vector3[] vertices = contour.Select(point => new Vector3(point.X, point.Y, 0)).ToArray();
 
         Triangulator triangulator = new(vertices.Select(v => (Vector2)v).ToArray());
@@ -394,21 +410,27 @@ public class ObjectInitializer : MonoBehaviour
     /// <param name="contour">The array of contour points to be normalized.</param>
     /// <param name="canvasWidth">The width of the canvas.</param>
     /// <param name="canvasHeight">The height of the canvas.</param>
-    public Point[] NormalizeContour(Point[] contour, Vector2 centroid, float canvasWidth, float canvasHeight)
+    public Point[] NormalizeContour(Point[] contour, Vector2 centroid, float canvasWidth, float canvasHeight, float rotationAngle)
     {
         Point[] normalizedContour = new Point[contour.Length];
 
         float centerX = canvasWidth / 2f;
         float centerY = canvasHeight / 2f;
+        float normalizedRotationAngle = rotationAngle * Mathf.Deg2Rad;
+
+        float cosAngle = Mathf.Cos(normalizedRotationAngle);
+        float sinAngle = Mathf.Sin(normalizedRotationAngle);
 
         for (int i = 0; i < contour.Length; i++)
         {
-            Point shiftedPoint = new(
-                contour[i].X - centerX - centroid.x,
-                centerY - contour[i].Y - centroid.y
-            );
+            float shiftedX = contour[i].X - centerX - centroid.x;
+            float shiftedY = centerY - contour[i].Y - centroid.y;
 
-            normalizedContour[i] = shiftedPoint;
+            float rotatedX = shiftedX * cosAngle + shiftedY * sinAngle; // swapped sign
+            float rotatedY = -shiftedX * sinAngle + shiftedY * cosAngle; // swapped sign
+
+            Point normalizedPoint = new((int)rotatedX, (int)rotatedY);
+            normalizedContour[i] = normalizedPoint;
         }
 
         return normalizedContour;

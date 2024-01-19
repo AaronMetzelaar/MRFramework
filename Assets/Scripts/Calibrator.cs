@@ -22,13 +22,11 @@ public class Calibrator : MonoBehaviour
     [NonSerialized] public WebCamTexture webcamTexture;
     // Public property for the camera rotation
     [SerializeField] private CameraRotationOption cameraRotation;
-    [SerializeField] public RawImage fullImage;
+    [SerializeField] public Image calibrationImageContainer;
     [SerializeField] public TextMeshProUGUI instructionText;
-    [SerializeField] public Texture2D calibrationImage;
-
+    [SerializeField] public Sprite calibrationImage;
     // Boolean to check if the camera is flipped
     [NonSerialized] private bool isFlipped = false;
-
     [NonSerialized] public bool isCalibrating = true;
     private Mat cameraMatrix;
     private Mat distortionCoefficients;
@@ -76,10 +74,11 @@ public class Calibrator : MonoBehaviour
     {
         instructionText.gameObject.SetActive(false);
         canvasPreviewImage.gameObject.SetActive(false);
-        SetCalibrationImage();
+        // SetCalibrationImage();
+        calibrationImageContainer.gameObject.SetActive(true);
         yield return new WaitForSeconds(3.0f);
         RunDetection();
-        fullImage.gameObject.SetActive(false);
+        calibrationImageContainer.gameObject.SetActive(false);
     }
 
     /// <summary>
@@ -95,13 +94,12 @@ public class Calibrator : MonoBehaviour
 
         cameraMatrix = null;
         distortionCoefficients = null;
-        fullImage.gameObject.SetActive(true);
+        calibrationImageContainer.gameObject.SetActive(true);
         instructionText.gameObject.SetActive(false);
-        SetCalibrationImage();
         // Give the camera some time to take a picture
         yield return new WaitForSeconds(0.2f);
         RunDetection();
-        fullImage.gameObject.SetActive(false);
+        calibrationImageContainer.gameObject.SetActive(false);
         instructionText.gameObject.SetActive(true);
         instructionText.text = "Rectangle set.\n\n" +
                                 "Press <b>Spacebar</b> to recalibrate the rectangle.\n" +
@@ -133,8 +131,8 @@ public class Calibrator : MonoBehaviour
 
             transformationMatrix = GetTransformationMatrix(corners);
             Mat croppedImage = CropImage(image, corners);
-
             ChequerboardCalibration(croppedImage);
+
             Point[] undistortedCorners = UndistortPoints(corners, cameraMatrix, distortionCoefficients);
 
             Mat baseImage = await GetBaseImageAsync();
@@ -187,7 +185,7 @@ public class Calibrator : MonoBehaviour
             return null;
         }
 
-        fullImage.gameObject.SetActive(false);
+        calibrationImageContainer.gameObject.SetActive(false);
         instructionText.gameObject.SetActive(false);
         await Task.Delay(500);
 
@@ -275,7 +273,7 @@ public class Calibrator : MonoBehaviour
         else
         {
             canvasPreviewImage.texture = webcamTexture;
-            fullImage.gameObject.SetActive(false);
+            calibrationImageContainer.gameObject.SetActive(false);
             Debug.LogError("No rectangle found.");
             return null;
         }
@@ -288,7 +286,7 @@ public class Calibrator : MonoBehaviour
         return null;
     }
 
-    public void ChequerboardCalibration(Mat image)
+    public Mat ChequerboardCalibration(Mat image)
     {
         Size patternSize = new(9, 6);
         Cv2.FindChessboardCorners(image, patternSize, out Point2f[] corners,
@@ -319,29 +317,21 @@ public class Calibrator : MonoBehaviour
                                 out _, out _);
 
             // Save to calibrator data
-            // Change this to be done all in one
             cameraMatrix = camMatrix;
             distortionCoefficients = distCoeffs;
 
-            // To see the undistorted image, uncomment the following line
+            // To see the undistorted image, uncomment the following lines
+            // Mat undistortedImage = new();
+            // Cv2.Undistort(image, undistortedImage, camMatrix, distCoeffs);
             // canvasPreviewImage.texture = OpenCvSharp.Unity.MatToTexture(undistortedImage);
         }
         else
         {
             Debug.LogError("Chessboard corners not found.");
-        }
-    }
-
-    // Display the calibrationImage image on the fullImage RawImage
-    public void SetCalibrationImage()
-    {
-        if (calibrationImage == null)
-        {
-            Debug.LogError("No calibration image found.");
-            return;
+            return null;
         }
 
-        fullImage.texture = calibrationImage;
+        return image;
     }
 
     /// <summary>
@@ -453,7 +443,7 @@ public class Calibrator : MonoBehaviour
     /// <returns>The transformation matrix.</returns>
     public Mat GetTransformationMatrix(Point[] corners)
     {
-        float aspectRatio = (float)(corners[1].X - corners[0].X) / (corners[2].Y - corners[0].Y);
+        // float aspectRatio = (float)(corners[1].X - corners[0].X) / (corners[2].Y - corners[0].Y);
 
         // Source points as seen by the camera
         Point2f[] sourcePoints = OrderCorners(corners.Select(corner => new Point2f(corner.X, corner.Y)).ToArray());
