@@ -74,15 +74,16 @@ public class Calibrator : MonoBehaviour
     {
         instructionText.gameObject.SetActive(false);
         canvasPreviewImage.gameObject.SetActive(false);
-        // SetCalibrationImage();
         calibrationImageContainer.gameObject.SetActive(true);
+
         yield return new WaitForSeconds(3.0f);
         RunDetection();
+
         calibrationImageContainer.gameObject.SetActive(false);
     }
 
     /// <summary>
-    /// Coroutine that recalibrates the canvas corner detection.
+    /// Coroutine that recalibrates the canvas corner detection and distortion coefficients.
     /// </summary>
     /// <returns>An IEnumerator used for coroutine execution.</returns>
     public IEnumerator Recalibrate()
@@ -108,7 +109,7 @@ public class Calibrator : MonoBehaviour
     }
 
     /// <summary>
-    /// Runs the corner detection algorithm on the color image texture obtained from the camera data.
+    /// Runs the detection process to identify and calibrate the playing field.
     /// </summary>
     private async void RunDetection()
     {
@@ -146,6 +147,9 @@ public class Calibrator : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Sets the base image, which is later used to subtract the background from the camera feed.
+    /// </summary>
     public async void SetBaseImage()
     {
         canvasPreviewImage.gameObject.SetActive(false);
@@ -167,10 +171,12 @@ public class Calibrator : MonoBehaviour
                                 "Press <b>Spacebar</b> to recalibrate the rectangle.\n" +
                                 "Press <b>B</b> to set a new base image based on the current found rectangle.\n" +
                                "Press <b>Enter</b> to continue.";
-
     }
 
-    // Gets an image of the cropped and distorted board without anything projected on it
+    /// <summary>
+    /// Asynchronously retrieves the base image from the webcam and applies distortion correction.
+    /// </summary>
+    /// <returns>The base image with distortion correction and cropping applied.</returns>
     public async Task<Mat> GetBaseImageAsync()
     {
         if (webcamTexture == null || !webcamTexture.isPlaying)
@@ -189,17 +195,18 @@ public class Calibrator : MonoBehaviour
         instructionText.gameObject.SetActive(false);
         await Task.Delay(500);
 
-        // Texture2D texture2D = TextureToTexture2D(webcamTexture);
         Mat image = OpenCvSharp.Unity.TextureToMat(webcamTexture);
         Mat baseImage = GetUndistortedCroppedImage(image, transformationMatrix, cameraMatrix, distortionCoefficients);
 
         return baseImage;
     }
 
-    /// Detects corners in the given texture using OpenCV.
+
+    /// <summary>
+    /// Detects the corners of a projected rectangle in an image.
     /// </summary>
-    /// <param name="texture">The input texture.</param>
-    /// <returns>An array of points representing the detected corners, or null if no corners are found.</returns>
+    /// <param name="image">The input image.</param>
+    /// <returns>An array of points representing the corners of the detected rectangle, or null if no rectangle is found.</returns>
     public Point[] DetectProjectionCorners(Mat image)
     {
         Mat grayImage = new();
@@ -260,11 +267,8 @@ public class Calibrator : MonoBehaviour
         if (foundRectangle)
         {
             Cv2.Polylines(image, new[] { rectangleCorners }, true, new Scalar(0, 255, 0), 5);
-
-            // Convert back to Texture2D
             Texture2D textureWithRectangle = OpenCvSharp.Unity.MatToTexture(image);
 
-            // Update the RawImage texture
             if (canvasPreviewImage != null)
             {
                 canvasPreviewImage.texture = textureWithRectangle;
@@ -286,6 +290,11 @@ public class Calibrator : MonoBehaviour
         return null;
     }
 
+    /// <summary>
+    /// Calibrates the camera using a chequerboard pattern.
+    /// </summary>
+    /// <param name="image">The input image.</param>
+    /// <returns>The input image, calibrated with distortion correction.</returns>
     public Mat ChequerboardCalibration(Mat image)
     {
         Size patternSize = new(9, 6);
@@ -406,7 +415,13 @@ public class Calibrator : MonoBehaviour
         return rawImage;
     }
 
-    // Transform points using the camera matrix and distortion coefficients
+    /// <summary>
+    /// Undistorts an array of points using the provided camera matrix and distortion coefficients.
+    /// </summary>
+    /// <param name="points">The array of points to be undistorted.</param>
+    /// <param name="cameraMatrix">The camera matrix.</param>
+    /// <param name="distortionCoefficients">The distortion coefficients.</param>
+    /// <returns>An array of undistorted points.</returns>
     public Point[] UndistortPoints(Point[] points, Mat cameraMatrix, Mat distortionCoefficients)
     {
         if (points == null)
@@ -506,6 +521,14 @@ public class Calibrator : MonoBehaviour
         return transformedImage;
     }
 
+    /// <summary>
+    /// Undistorts and crops the input image based on the provided transformation matrix, camera matrix, and distortion coefficients.
+    /// </summary>
+    /// <param name="image">The input image to be undistorted and cropped.</param>
+    /// <param name="transformationMatrix">The transformation matrix.</param>
+    /// <param name="cameraMatrix">The camera matrix.</param>
+    /// <param name="distortionCoefficients">The distortion coefficients.</param>
+    /// <returns>The undistorted and cropped image.</returns>
     public Mat GetUndistortedCroppedImage(Mat image, Mat transformationMatrix, Mat cameraMatrix, Mat distortionCoefficients)
     {
         if (cameraMatrix == null || distortionCoefficients == null)
@@ -521,38 +544,6 @@ public class Calibrator : MonoBehaviour
         Cv2.WarpPerspective(undistortedImage, croppedImage, transformationMatrix, new Size(Screen.width, Screen.height));
 
         return croppedImage;
-    }
-
-    /// <summary>
-    /// Maps a camera point to a game point using a transformation matrix.
-    /// </summary>
-    /// <param name="cameraPoint">The camera point to be mapped.</param>
-    /// <param name="transformationMatrix">The transformation matrix.</param>
-    /// <returns>The mapped game point.</returns>
-    public Point MapCameraPointToGame(Point cameraPoint, Mat transformationMatrix)
-    {
-        Point2f[] cameraPointArray = new Point2f[] { new(cameraPoint.X, cameraPoint.Y) };
-        Point2f[] gamePointArray = Cv2.PerspectiveTransform(cameraPointArray, transformationMatrix);
-
-        return new Point(gamePointArray[0].X, gamePointArray[0].Y);
-    }
-
-    /// <summary>
-    /// Swaps points in a given array of points based on the camera rotation option.
-    /// </summary>
-    /// <param name="points">The array of points to be swapped.</param>
-    /// <returns>The swapped array of points.</returns>
-    private Point[] SwapPoints(Point[] points)
-    {
-        if (cameraRotation == CameraRotationOption.MirroredVertically)
-        {
-            for (int i = 0; i < points.Length; i++)
-            {
-                points[i] = new Point(webcamTexture.width - points[i].X, webcamTexture.height - points[i].Y);
-            }
-        }
-
-        return points;
     }
 
     /// <summary>

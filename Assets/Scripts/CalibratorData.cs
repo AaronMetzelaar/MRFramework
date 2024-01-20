@@ -1,6 +1,9 @@
 using OpenCvSharp;
 using System;
 
+/// <summary>
+/// Represents the data that is necessary to calibrate the camera.
+/// </summary>
 [Serializable]
 public class CalibratorData
 {

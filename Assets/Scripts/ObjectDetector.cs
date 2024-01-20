@@ -31,6 +31,9 @@ public class ObjectDetector : MonoBehaviour
     private Dictionary<DetectedValues, GameObject> activeObjects;
     private HashSet<DetectedValues> currentObjectIds;
 
+    /// <summary>
+    /// Initializes the object detector by checking for required components and resources.
+    /// </summary>
     public void Initialize()
     {
         if (!TryGetComponent(out calibrator))
@@ -72,6 +75,9 @@ public class ObjectDetector : MonoBehaviour
         InvokeRepeating(nameof(UpdateObjects), 0f, detectionInterval);
     }
 
+    /// <summary>
+    /// Stops the object detection process.
+    /// </summary>
     public void StopDetecting()
     {
         fullImage.gameObject.SetActive(true);
@@ -112,10 +118,13 @@ public class ObjectDetector : MonoBehaviour
             currentObjectIds.Add(GetObjectId(detectedObject));
         }
 
-        RemoveAllActiveObjects();
+        RemoveAllInactiveObjects();
     }
 
-    private void RemoveAllActiveObjects()
+    /// <summary>
+    /// Removes all inactive objects from the activeObjects dictionary.
+    /// </summary>
+    private void RemoveAllInactiveObjects()
     {
         List<DetectedValues> inactiveObjectIds = new();
 
@@ -139,6 +148,10 @@ public class ObjectDetector : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Retrieves a list of detected objects.
+    /// </summary>
+    /// <returns>A list of DetectedObject instances representing the detected objects.</returns>
     public List<DetectedObject> GetDetectedObjects()
     {
         if (!isDetecting || activeObjects.Count == 0) return new List<DetectedObject>();
@@ -149,6 +162,7 @@ public class ObjectDetector : MonoBehaviour
     /// Finds objects in the given image using contour detection and shape matching.
     /// </summary>
     /// <param name="image">The image to search for objects in.</param>
+    /// <param name="undistortedCroppedImage">The undistorted and cropped image (with colors).</param>
     /// <returns>An array of DetectedObject instances representing the detected objects.</returns>
     List<DetectedObject> FindObjects(Mat image, Mat undistortedCroppedImage)
     {
@@ -195,9 +209,13 @@ public class ObjectDetector : MonoBehaviour
         return detectedObjects;
     }
 
+    /// <summary>
+    /// Merges close contours together to form a single contour.
+    /// </summary>
+    /// <param name="contours">The array of contours to merge.</param>
+    /// <returns>The merged contours as an array of points.</returns>
     public Point[][] MergeCloseContours(Point[][] contours)
     {
-        // Find contours that are close to each other, do convex hull on them to merge them
         List<Point[]> mergedContours = new();
         bool[] merged = new bool[contours.Length];
 
@@ -224,22 +242,6 @@ public class ObjectDetector : MonoBehaviour
         }
 
         return mergedContours.ToArray();
-    }
-
-    private bool AreContoursClose(Point[] contour1, Point[] contour2)
-    {
-        foreach (Point point1 in contour1)
-        {
-            foreach (Point point2 in contour2)
-            {
-                float distance = Mathf.Sqrt(Mathf.Pow(point1.X - point2.X, 2) + Mathf.Pow(point1.Y - point2.Y, 2));
-                if (distance < contourMargin)
-                {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 
     /// <summary>
@@ -304,34 +306,6 @@ public class ObjectDetector : MonoBehaviour
     }
 
     /// <summary>
-    /// Removes inactive objects from the activeObjects dictionary.
-    /// </summary>
-    // private void RemoveInactiveObjects()
-    // {
-    //     List<DetectedValues> inactiveObjectIds = new();
-
-    //     foreach (KeyValuePair<DetectedValues, GameObject> activeObject in activeObjects)
-    //     {
-    //         if (!activeObject.Value.activeSelf)
-    //         {
-    //             inactiveObjectIds.Add(activeObject.Key);
-    //         }
-    //     }
-
-    //     foreach (var inactiveObjectId in inactiveObjectIds)
-    //     {
-    //         GameObject inactiveObject = activeObjects[inactiveObjectId];
-    //         if (inactiveObject != null)
-    //         {
-    //             Debug.Log($"Removing inactive object with id {inactiveObjectId}");
-    //             objectStateManager.UnregisterObject(inactiveObject.GetComponent<DetectedObject>());
-    //             Destroy(inactiveObject);
-    //         }
-    //         activeObjects.Remove(inactiveObjectId);
-    //     }
-    // }
-
-    /// <summary>
     /// Calculates and returns the smallest contour area from the given array of initiated objects.
     /// </summary>
     /// <param name="initializedObjects">The array of initiated objects.</param>
@@ -351,7 +325,35 @@ public class ObjectDetector : MonoBehaviour
         return smallestArea;
     }
 
-    bool AreHuesSimilar(float hue1, float hue2)
+    /// <summary>
+    /// Determines whether two contours are close to each other based on a specified margin.
+    /// </summary>
+    /// <param name="contour1">The first contour.</param>
+    /// <param name="contour2">The second contour.</param>
+    /// <returns>True if the contours are close to each other; otherwise, false.</returns>
+    private bool AreContoursClose(Point[] contour1, Point[] contour2)
+    {
+        foreach (Point point1 in contour1)
+        {
+            foreach (Point point2 in contour2)
+            {
+                float distance = Mathf.Sqrt(Mathf.Pow(point1.X - point2.X, 2) + Mathf.Pow(point1.Y - point2.Y, 2));
+                if (distance < contourMargin)
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Checks if two hues are similar based on a specified margin.
+    /// </summary>
+    /// <param name="hue1">The first hue value.</param>
+    /// <param name="hue2">The second hue value.</param>
+    /// <returns>True if the hues are similar, false otherwise.</returns>
+    private bool AreHuesSimilar(float hue1, float hue2)
     {
         float hueDifference = Mathf.Abs(hue1 - hue2);
         return hueDifference < hueMargin;

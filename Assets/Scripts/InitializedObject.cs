@@ -2,6 +2,9 @@ using System;
 using OpenCvSharp;
 using UnityEngine;
 
+/// <summary>
+/// Represents an initialized object in the scene.
+/// </summary>
 [Serializable]
 public class InitializedObject
 {

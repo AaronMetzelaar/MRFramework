@@ -19,6 +19,7 @@ public class ObjectInitializer : MonoBehaviour
     [SerializeField] private GameObject prefabMaterialEmpty;
     [SerializeField] private ObjectData objectData;
     [SerializeField] private TextMeshProUGUI instructionText;
+    [Tooltip("The color of the object to be initialized. Will be set to a contrasting color if not specified.")]
     [SerializeField] public Color objectColor = default;
 
     InitializedObject initializedObject = new();
@@ -29,7 +30,7 @@ public class ObjectInitializer : MonoBehaviour
     Mat kernel;
 
     /// <summary>
-    /// Initializes the object.
+    /// Initializes the object initializer by getting the calibrator and webcam texture.
     /// </summary>
     public void Initialize()
     {
@@ -48,7 +49,7 @@ public class ObjectInitializer : MonoBehaviour
     }
 
     /// <summary>
-    /// Coroutine that delays the initiation of an object.
+    /// Coroutine that delays the initialization of an object.
     /// </summary>
     /// <returns>An IEnumerator used for coroutine execution.</returns>
     public IEnumerator DelayedIntialize()
@@ -73,14 +74,6 @@ public class ObjectInitializer : MonoBehaviour
         {
             Destroy(currentVisualizedObject);
         }
-        // if (initializedObject != null)
-        // {
-        //     initializedObject.Contour = null;
-        //     initializedObject.WhiteHue = 0f;
-        //     initializedObject.Color = Color.clear;
-        //     initializedObject.ColorHue = 0f;
-        //     initializedObject.Name = "Object";
-        // }
 
         fullImage.texture = null;
         differenceImage?.Dispose();
@@ -92,6 +85,11 @@ public class ObjectInitializer : MonoBehaviour
         StartCoroutine(DelayedIntialize());
     }
 
+    /// <summary>
+    /// Initializes a named object with the specified name and color.
+    /// </summary>
+    /// <param name="objectName">The name of the object.</param>
+    /// <param name="color">The color of the object.</param>
     public void InitializeNamedObject(string objectName, Color color)
     {
         initializedObject = new()
@@ -104,7 +102,7 @@ public class ObjectInitializer : MonoBehaviour
     }
 
     /// <summary>
-    /// Captures an image, initiates an object, and visualizes it.
+    /// Captures an image, initializes an object, and performs necessary calculations and operations.
     /// </summary>
     public async void CaptureAndInitializeObject()
     {
@@ -125,7 +123,6 @@ public class ObjectInitializer : MonoBehaviour
         differenceImage = SubtractImages(calibratorData.BaseImage, undistortedCroppedImage);
         Mat grayImage = TransformImage(differenceImage);
         Point[] contour = FindContour(grayImage, undistortedCroppedImage);
-        // fullImage.texture = OpenCvSharp.Unity.MatToTexture(grayImage);
 
         if (contour == null)
         {
@@ -151,6 +148,10 @@ public class ObjectInitializer : MonoBehaviour
         initializedObject.Color = (objectColor == default) ? GetContrastingColor(initializedObject.WhiteHue) : objectColor;
     }
 
+    /// <summary>
+    /// Retrieves an image from the webcam asynchronously.
+    /// </summary>
+    /// <returns>The captured image as a Mat object.</returns>
     public async Task<Mat> GetImageFromWebcam()
     {
         await Task.Delay(500);
@@ -202,19 +203,6 @@ public class ObjectInitializer : MonoBehaviour
     }
 
     /// <summary>
-    /// Subtracts two images and returns the result as a new Mat object.
-    /// </summary>
-    /// <param name="image1">The first image to subtract.</param>
-    /// <param name="image2">The second image to subtract.</param>
-    /// <returns>A new Mat object representing the result of the subtraction.</returns>
-    public Mat SubtractImages(Mat image1, Mat image2)
-    {
-        Mat result = new();
-        Cv2.Absdiff(image1, image2, result);
-        return result;
-    }
-
-    /// <summary>
     /// Finds the contour of an object in an image using the provided threshold image.
     /// </summary>
     /// <param name="thresholdImage">The threshold image used for contour detection.</param>
@@ -259,6 +247,32 @@ public class ObjectInitializer : MonoBehaviour
         // initializedGameObject.transform.localRotation = Quaternion.Euler(0, 0, rotationAngle);
 
         return largestContour;
+    }
+
+    /// <summary>
+    /// Visualizes the initiated object by instantiating a game object and setting its position and mesh based on the initiated object's properties.
+    /// </summary>
+    /// <param name="contour">The contour of the initiated object. This must be normalized beforehand.</param>
+    /// <param name="image">The image used for visualization.</param>
+    public GameObject VisualizeObject(Point[] contour, Mat image, Vector2 centroidInCanvasSpace, float rotationAngle, Color color = default)
+    {
+        // Uncomment the following lines to draw the contour on the image
+        // image = DrawContour(image, contour);
+        // fullImage.texture = OpenCvSharp.Unity.MatToTexture(image);
+
+        GameObject detectedObject = Instantiate(prefabMaterialEmpty, new Vector3(centroidInCanvasSpace.x, centroidInCanvasSpace.y, -0.01f), Quaternion.identity);
+        detectedObject.transform.SetParent(canvasPos, false);
+
+        if (detectedObject.TryGetComponent(out MeshFilter meshFilter))
+            meshFilter.mesh = CreateMeshFromContour(contour, centroidInCanvasSpace);
+        else
+            Debug.LogError("Material not found.");
+        detectedObject.GetComponent<MeshRenderer>().material.color = color;
+        detectedObject.transform.localRotation = Quaternion.Euler(0, 0, rotationAngle);
+
+        currentVisualizedObject = detectedObject;
+
+        return detectedObject;
     }
 
     /// <summary>
@@ -353,29 +367,16 @@ public class ObjectInitializer : MonoBehaviour
     }
 
     /// <summary>
-    /// Visualizes the initiated object by instantiating a game object and setting its position and mesh based on the initiated object's properties.
+    /// Subtracts two images and returns the result as a new Mat object.
     /// </summary>
-    /// <param name="contour">The contour of the initiated object. This must be normalized beforehand.</param>
-    /// <param name="image">The image used for visualization.</param>
-    public GameObject VisualizeObject(Point[] contour, Mat image, Vector2 centroidInCanvasSpace, float rotationAngle, Color color = default)
+    /// <param name="image1">The first image to subtract.</param>
+    /// <param name="image2">The second image to subtract.</param>
+    /// <returns>A new Mat object representing the result of the subtraction.</returns>
+    public Mat SubtractImages(Mat image1, Mat image2)
     {
-        // Uncomment the following lines to draw the contour on the image
-        // image = DrawContour(image, contour);
-        // fullImage.texture = OpenCvSharp.Unity.MatToTexture(image);
-
-        GameObject detectedObject = Instantiate(prefabMaterialEmpty, new Vector3(centroidInCanvasSpace.x, centroidInCanvasSpace.y, -0.01f), Quaternion.identity);
-        detectedObject.transform.SetParent(canvasPos, false);
-
-        if (detectedObject.TryGetComponent(out MeshFilter meshFilter))
-            meshFilter.mesh = CreateMeshFromContour(contour, centroidInCanvasSpace);
-        else
-            Debug.LogError("Material not found.");
-        detectedObject.GetComponent<MeshRenderer>().material.color = color;
-        detectedObject.transform.localRotation = Quaternion.Euler(0, 0, rotationAngle);
-
-        currentVisualizedObject = detectedObject;
-
-        return detectedObject;
+        Mat result = new();
+        Cv2.Absdiff(image1, image2, result);
+        return result;
     }
 
     /// <summary>
@@ -426,8 +427,8 @@ public class ObjectInitializer : MonoBehaviour
             float shiftedX = contour[i].X - centerX - centroid.x;
             float shiftedY = centerY - contour[i].Y - centroid.y;
 
-            float rotatedX = shiftedX * cosAngle + shiftedY * sinAngle; // swapped sign
-            float rotatedY = -shiftedX * sinAngle + shiftedY * cosAngle; // swapped sign
+            float rotatedX = shiftedX * cosAngle + shiftedY * sinAngle;
+            float rotatedY = -shiftedX * sinAngle + shiftedY * cosAngle;
 
             Point normalizedPoint = new((int)rotatedX, (int)rotatedY);
             normalizedContour[i] = normalizedPoint;
@@ -457,18 +458,6 @@ public class ObjectInitializer : MonoBehaviour
         }
 
         return translatedContour;
-    }
-
-    private Point RotatePoint(Point point, Point center, float angle)
-    {
-        double radians = angle * Math.PI / 180.0;
-        double cos = Math.Cos(radians);
-        double sin = Math.Sin(radians);
-
-        int rotatedX = (int)(cos * (point.X - center.X) - sin * (point.Y - center.Y) + center.X);
-        int rotatedY = (int)(sin * (point.X - center.X) + cos * (point.Y - center.Y) + center.Y);
-
-        return new Point(rotatedX, rotatedY);
     }
 
     /// <summary>
