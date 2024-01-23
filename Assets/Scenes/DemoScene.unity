@@ -38,7 +38,7 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 705507994}
-  m_IndirectSpecularColor: {r: 0.44657898, g: 0.4964133, b: 0.5748178, a: 1}
+  m_IndirectSpecularColor: {r: 0, g: 0, b: 0, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -538,6 +538,8 @@ MonoBehaviour:
   objectData: {fileID: 11400000, guid: decb7499f3955e949848fcf22ed12580, type: 2}
   instructionText: {fileID: 384782496}
   objectColor: {r: 0, g: 1, b: 0.09368992, a: 0}
+  objectName: Object
+  checkColor: 1
 --- !u!114 &779092893
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -601,10 +603,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   fullImage: {fileID: 668560654}
   objectData: {fileID: 11400000, guid: decb7499f3955e949848fcf22ed12580, type: 2}
+  maxObjectCount: 1
   objectMatchThreshold: 0.05
   detectionInterval: 0.1
   positionMargin: 75
-  contourMargin: 25
+  contourMergeMargin: 20
   hueMargin: 0.1
 --- !u!114 &779092897
 MonoBehaviour:
@@ -618,6 +621,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 81161ead5e175da4e8824fb61002e95e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  rotationOffset: 50
+  overrideColor: {r: 1, g: 1, b: 1, a: 1}
 --- !u!114 &779092898
 MonoBehaviour:
   m_ObjectHideFlags: 0

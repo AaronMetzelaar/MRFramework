@@ -93,7 +93,7 @@ public class ApplicationFlowManager : MonoBehaviour
                     {
                         currentState = AppState.Initialization;
                         objectInitializer.Initialize();
-                        objectInitializer.InitializeNamedObject(simulation.objectsToInitialize[0].Item1, simulation.objectsToInitialize[0].Item2);
+                        objectInitializer.InitializeNamedObject(simulation.objectsToInitialize[0].Item1, simulation.objectsToInitialize[0].Item2, simulation.objectsToInitialize[0].Item3);
                         instructionText.text = $"Place the <b>{simulation.objectsToInitialize[0].Item1}</b> object in the center of the canvas.\n\n" +
                                                "Press <b>Spacebar</b> to initiate object detection.\n";
                     }
@@ -127,7 +127,7 @@ public class ApplicationFlowManager : MonoBehaviour
 
                     if (simulation.objectsToInitialize.Count - 1 >= objectsToInitializeIndex)
                     {
-                        objectInitializer.InitializeNamedObject(simulation.objectsToInitialize[objectsToInitializeIndex].Item1, simulation.objectsToInitialize[objectsToInitializeIndex].Item2);
+                        objectInitializer.InitializeNamedObject(simulation.objectsToInitialize[objectsToInitializeIndex].Item1, simulation.objectsToInitialize[objectsToInitializeIndex].Item2, simulation.objectsToInitialize[objectsToInitializeIndex].Item3);
                         instructionText.text = $"Place the <b>{simulation.objectsToInitialize[objectsToInitializeIndex].Item1}</b> object in the center of the canvas.\n\n" +
                        "Press <b>Spacebar</b> to reinitialize.\n" +
                        "Press <b>Enter</b> to save the object and continue.";

@@ -18,4 +18,6 @@ public class InitializedObject
     public Point[] Contour;
     // Name of the object, defaults to "Object"
     public string Name = "Object";
+    // Whether to check for the color of the object
+    public bool CheckColor = true;
 }

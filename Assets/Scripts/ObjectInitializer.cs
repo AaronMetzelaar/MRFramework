@@ -21,6 +21,10 @@ public class ObjectInitializer : MonoBehaviour
     [SerializeField] private TextMeshProUGUI instructionText;
     [Tooltip("The color of the object to be initialized. Will be set to a contrasting color if not specified.")]
     [SerializeField] public Color objectColor = default;
+    [Tooltip("The name of the object to be initialized. Will be set to \"Object\" if not specified.")]
+    [SerializeField] public string objectName = default;
+    [Tooltip("Whether to check for the color of the object when detecting it.")]
+    [SerializeField] public bool checkColor = true;
 
     InitializedObject initializedObject = new();
     Mat differenceImage;
@@ -88,17 +92,13 @@ public class ObjectInitializer : MonoBehaviour
     /// <summary>
     /// Initializes a named object with the specified name and color.
     /// </summary>
-    /// <param name="objectName">The name of the object.</param>
+    /// <param name="name">The name of the object.</param>
     /// <param name="color">The color of the object.</param>
-    public void InitializeNamedObject(string objectName, Color color)
+    public void InitializeNamedObject(string name, Color color, bool checkColorBool = true)
     {
-        initializedObject = new()
-        {
-            Color = color,
-            Name = objectName
-        };
-
+        objectName = name;
         objectColor = color;
+        checkColor = checkColorBool;
     }
 
     /// <summary>
@@ -146,6 +146,8 @@ public class ObjectInitializer : MonoBehaviour
         initializedObject.WhiteHue = GetObjectHue(undistortedCroppedImage, contour);
         initializedObject.ColorHue = GetObjectHue(newUndistortedCroppedImage, contour);
         initializedObject.Color = (objectColor == default) ? GetContrastingColor(initializedObject.WhiteHue) : objectColor;
+        initializedObject.Name = objectName;
+        initializedObject.CheckColor = checkColor;
     }
 
     /// <summary>
@@ -227,7 +229,7 @@ public class ObjectInitializer : MonoBehaviour
         double area = Cv2.ContourArea(largestContour);
         double canvasArea = fullImage.rectTransform.rect.width * fullImage.rectTransform.rect.height;
         double maxArea = canvasArea * 0.5;
-        double minArea = canvasArea * 0.005;
+        double minArea = canvasArea * 0.0025; // 0.25% of the canvas area, can adjust when using really small objects
 
         if (area < minArea || area > maxArea)
         {
@@ -243,8 +245,7 @@ public class ObjectInitializer : MonoBehaviour
         float rotationAngle = GetRotationAngle(largestContour);
         Color color = objectColor == default ? GetContrastingColor(initializedObject.WhiteHue) : objectColor;
         Point[] normalizedContour = NormalizeContour(largestContour, centroidInCanvasSpace, Screen.width, Screen.height, rotationAngle);
-        GameObject initializedGameObject = VisualizeObject(normalizedContour, image, centroidInCanvasSpace, rotationAngle, color);
-        // initializedGameObject.transform.localRotation = Quaternion.Euler(0, 0, rotationAngle);
+        GameObject initializedGameObject = VisualizeObject(normalizedContour, centroidInCanvasSpace, rotationAngle, color, objectName);
 
         return largestContour;
     }
@@ -254,12 +255,8 @@ public class ObjectInitializer : MonoBehaviour
     /// </summary>
     /// <param name="contour">The contour of the initiated object. This must be normalized beforehand.</param>
     /// <param name="image">The image used for visualization.</param>
-    public GameObject VisualizeObject(Point[] contour, Mat image, Vector2 centroidInCanvasSpace, float rotationAngle, Color color = default)
+    public GameObject VisualizeObject(Point[] contour, Vector2 centroidInCanvasSpace, float rotationAngle, Color color = default, string name = "Object")
     {
-        // Uncomment the following lines to draw the contour on the image
-        // image = DrawContour(image, contour);
-        // fullImage.texture = OpenCvSharp.Unity.MatToTexture(image);
-
         GameObject detectedObject = Instantiate(prefabMaterialEmpty, new Vector3(centroidInCanvasSpace.x, centroidInCanvasSpace.y, -0.01f), Quaternion.identity);
         detectedObject.transform.SetParent(canvasPos, false);
 
@@ -268,6 +265,7 @@ public class ObjectInitializer : MonoBehaviour
         else
             Debug.LogError("Material not found.");
         detectedObject.GetComponent<MeshRenderer>().material.color = color;
+        detectedObject.name = name;
         detectedObject.transform.localRotation = Quaternion.Euler(0, 0, rotationAngle);
 
         currentVisualizedObject = detectedObject;
@@ -288,6 +286,11 @@ public class ObjectInitializer : MonoBehaviour
         int centerX = (int)(moments.M10 / moments.M00);
         int centerY = (int)(moments.M01 / moments.M00);
 
+        if (centerX < 0 || centerX >= image.Width || centerY < 0 || centerY >= image.Height)
+        {
+            return -1;
+        }
+
         Vec3b pixel = image.Get<Vec3b>(centerY, centerX);
         Vector3 rgb = new(pixel.Item2, pixel.Item1, pixel.Item0);
         float hue = RgbToHue(rgb);
@@ -300,7 +303,7 @@ public class ObjectInitializer : MonoBehaviour
     /// </summary>
     /// <param name="rgb">The RGB color value to convert.</param>
     /// <returns>The hue value of the RGB color.</returns>
-    float RgbToHue(Vector3 rgb)
+    public float RgbToHue(Vector3 rgb)
     {
         float epsilon = 0.000001f; // Small number to avoid division by zero
 
@@ -479,13 +482,14 @@ public class ObjectInitializer : MonoBehaviour
     }
 
     /// <summary>
-    /// Draws a contour on the given image.
+    /// Draws contours on the given image.
     /// </summary>
     /// <param name="image">The image on which to draw the contour.</param>
     /// <param name="contour">The contour to be drawn.</param>
-    private Mat DrawContour(Mat image, Point[] contour)
+    public Mat DrawContours(Mat image, Point[][] contours)
     {
-        Cv2.Polylines(image, new Point[][] { contour }, true, new Scalar(0, 255, 0), 2);
+        foreach (Point[] contour in contours)
+            Cv2.Polylines(image, new Point[][] { contour }, true, new Scalar(0, 255, 0), 2);
 
         return image;
     }

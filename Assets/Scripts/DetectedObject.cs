@@ -49,3 +49,11 @@ public class DetectedObject : MonoBehaviour
         transform.localRotation = Quaternion.Euler(0, 0, rotationAngle);
     }
 }
+
+public struct DetectedInitializer
+{
+    public InitializedObject initializedObject;
+    public Vector2 centroidInCanvasSpace;
+    public Point[] contour;
+    public float rotationAngle;
+}
