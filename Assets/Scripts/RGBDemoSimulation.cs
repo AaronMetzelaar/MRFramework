@@ -11,9 +11,19 @@ public class RGBDemoSimulation : MonoBehaviour
 {
     [NonSerialized] private ObjectDetector objectDetector;
     [NonSerialized] private ObjectStateManager objectStateManager;
+    [Tooltip("The amount of degrees the offset is rotated by to have 0 degrees when the knob is in the middle.")]
+    [SerializeField] private int rotationOffset = 50;
     private Dictionary<Color, Action<DetectedObject>> objectRoleMappings;
-    public List<(string, Color)> objectsToInitialize;
-    // Start is called before the first frame update
+    private Dictionary<Color, float> colorValues = new()
+    {
+        { Color.red, 0.0f },
+        { Color.green, 0.0f },
+        { Color.blue, 0.0f }
+    };
+    public List<(string, Color, bool)> objectsToInitialize;
+
+    public Color overrideColor = Color.white;
+
     void Start()
     {
         if (!TryGetComponent(out objectDetector))
@@ -26,11 +36,17 @@ public class RGBDemoSimulation : MonoBehaviour
             Debug.LogError("ObjectStateManager not found in the scene.");
         }
 
-        objectsToInitialize = new List<(string, Color)>
+        if (objectStateManager != null)
         {
-            ("redKnob", Color.red),
-            ("greenKnob", Color.green),
-            ("blueKnob", Color.blue)
+            objectStateManager.OnRotationChangedCallback += HandleRotationChange;
+        }
+
+        objectsToInitialize = new List<(string, Color, bool)>
+        {
+            ("redKnob", Color.red, true),
+            ("greenKnob", Color.green, true),
+            ("blueKnob", Color.blue, true),
+            ("colorDisplay", Color.yellow, false)
         };
     }
 
@@ -44,34 +60,41 @@ public class RGBDemoSimulation : MonoBehaviour
         }
     }
 
-    // Update is called once per frame
-    void Update()
+    private void HandleRotationChange(DetectedObject changedObject)
     {
-
+        Color objectColor = changedObject.initializedObject.Color;
+        if (objectRoleMappings.TryGetValue(objectColor, out Action<DetectedObject> action))
+        {
+            action(changedObject);
+        }
     }
 
     private void InitializeObjectRoleMapping()
     {
-        Dictionary<Color, Action<DetectedObject>> objectRoleMappings = new()
-            {{ Color.red, HandleRedKnob },
-            { Color.green, HandleGreenKnob },
-            { Color.blue, HandleBlueKnob },
-        };
+        objectRoleMappings = new Dictionary<Color, Action<DetectedObject>>
+    {
+        { Color.red, HandleRedKnob },
+        { Color.green, HandleGreenKnob },
+        { Color.blue, HandleBlueKnob },
+    };
     }
 
     private void HandleRedKnob(DetectedObject redKnob)
     {
-        Debug.Log("Red knob detected");
+        colorValues[Color.red] = NormalizeRotationAngle(redKnob.rotationAngle);
+        UpdateColor();
     }
 
     private void HandleGreenKnob(DetectedObject greenKnob)
     {
-        Debug.Log("Green knob detected");
+        colorValues[Color.green] = NormalizeRotationAngle(greenKnob.rotationAngle);
+        UpdateColor();
     }
 
     private void HandleBlueKnob(DetectedObject blueKnob)
     {
-        Debug.Log("Blue knob detected");
+        colorValues[Color.blue] = NormalizeRotationAngle(blueKnob.rotationAngle);
+        UpdateColor();
     }
 
     public void OnRotationChange(DetectedObject changedObject)
@@ -81,6 +104,45 @@ public class RGBDemoSimulation : MonoBehaviour
         {
             action(changedObject);
         }
-        Debug.Log("Rotation changed to " + changedObject.rotationAngle);
+    }
+
+    // Subtracts the rotation offset from the rotation angle while keeping the angle in the range [0, 360)
+    // Also makes sure that the change is less close to 0 and 360
+    public float NormalizeRotationAngle(float rotationAngle)
+    {
+        float normalizedRotationAngle = rotationAngle - rotationOffset;
+        if (normalizedRotationAngle < 0.0f)
+        {
+            normalizedRotationAngle += 360.0f;
+        }
+        return normalizedRotationAngle;
+    }
+
+    private void UpdateColor()
+    {
+        float red = colorValues[Color.red] / 360.0f;
+        float green = colorValues[Color.green] / 360.0f;
+        float blue = colorValues[Color.blue] / 360.0f;
+
+        if (objectsToInitialize != null)
+        {
+            foreach (var (name, _, _) in objectsToInitialize)
+            {
+                if (name == "colorDisplay")
+                {
+                    GameObject colorDisplay = GameObject.Find(name);
+
+                    if (colorDisplay == null)
+                    {
+                        break; // no color display found, so we can't update the color
+                    }
+
+                    Material mat = colorDisplay.GetComponent<Renderer>().material;
+                    mat.SetColor("_Color", new Color(red, green, blue));
+                    // Set the initialised object's color to the color of the color display
+                    colorDisplay.GetComponent<DetectedObject>().initializedObject.Color = new Color(red, green, blue);
+                }
+            }
+        }
     }
 }

@@ -2,7 +2,7 @@ Shader "Unlit/DiffuseBothSided"
 {
     Properties
     {
-        _Color ("Color", Color) = (1,1,1,1)
+        _Color ("_Color", Color) = (1,1,1,1)
     }
     SubShader
     {
