@@ -12,17 +12,38 @@ public class ApplicationFlowManager : MonoBehaviour
         Simulation
     }
 
-    [NonSerialized] private Calibrator calibrator;
-    [NonSerialized] private ObjectInitializer objectInitializer;
-    [NonSerialized] private ObjectDetector objectDetector;
-    [Tooltip("The simulation file to load. This file should have a list of objects to be initialized.")]
-    [NonSerialized] private RGBDemoSimulation simulation;
-    [SerializeField] private ObjectData objectData;
-    [SerializeField] private TextMeshProUGUI instructionText;
-    [SerializeField] private RawImage canvasPreviewImage;
-    [SerializeField] private RawImage fullImage;
-    [Tooltip("Enable this to save the initialized object data between sessions, skipping the initiation step.")]
-    [SerializeField] public bool saveObjectData = false;
+    [NonSerialized]
+    private Calibrator calibrator;
+
+    [NonSerialized]
+    private ObjectInitializer objectInitializer;
+
+    [NonSerialized]
+    private ObjectDetector objectDetector;
+
+    [Tooltip(
+        "The simulation file to load. This file should have a list of objects to be initialized."
+    )]
+    [NonSerialized]
+    private RGBDemoSimulation simulation;
+
+    [SerializeField]
+    private ObjectData objectData;
+
+    [SerializeField]
+    private TextMeshProUGUI instructionText;
+
+    [SerializeField]
+    private RawImage canvasPreviewImage;
+
+    [SerializeField]
+    private RawImage fullImage;
+
+    [Tooltip(
+        "Enable this to save the initialized object data between sessions, skipping the initiation step."
+    )]
+    [SerializeField]
+    public bool saveObjectData = false;
     private AppState currentState = AppState.Calibration;
     private bool firstInitialization = true;
     private int objectsToInitializeIndex = 0;
@@ -35,31 +56,24 @@ public class ApplicationFlowManager : MonoBehaviour
     void Start()
     {
         if (!TryGetComponent(out calibrator))
-        {
             Debug.LogError("Calibrator not found in the scene.");
-        }
 
         if (!TryGetComponent(out objectInitializer))
-        {
             Debug.LogError("ObjectInitializer not found in the scene.");
-        }
 
         if (!TryGetComponent(out objectDetector))
-        {
             Debug.LogError("ObjectDetector not found in the scene.");
-        }
 
         if (!TryGetComponent(out simulation))
-        {
             Debug.LogError("Simulation not found in the scene.");
-        }
 
-        instructionText.text = "If the border is incorrect, make sure the entire playing field is visible.\n" +
-                               "Also, make sure there is enough contrast between the playing field\n" +
-                               "and the surface underneath.\n\n" +
-                               "Press <b>Spacebar</b> to recalibrate.\n" +
-                               "Press <b>B</b> to set a base image based on the current found rectangle.\n" +
-                               "Press <b>Enter</b> to continue.";
+        instructionText.text =
+            "If the border is incorrect, make sure the entire playing field is visible.\n"
+            + "Also, make sure there is enough contrast between the playing field\n"
+            + "and the surface underneath.\n\n"
+            + "Press <b>Spacebar</b> to recalibrate.\n"
+            + "Press <b>B</b> to set a base image based on the current found rectangle.\n"
+            + "Press <b>Enter</b> to continue.";
     }
 
     /// <summary>
@@ -71,13 +85,9 @@ public class ApplicationFlowManager : MonoBehaviour
         {
             case AppState.Calibration:
                 if (Input.GetKeyDown(KeyCode.Space))
-                {
                     StartCoroutine(calibrator.Recalibrate());
-                }
                 if (Input.GetKeyDown(KeyCode.B))
-                {
                     calibrator.SetBaseImage();
-                }
                 if (Input.GetKeyDown(KeyCode.Return))
                 {
                     calibrator.isCalibrating = false;
@@ -87,15 +97,21 @@ public class ApplicationFlowManager : MonoBehaviour
                     if (saveObjectData && objectData.objectDataList.Count > 0)
                     {
                         currentState = AppState.Simulation;
-                        instructionText.text = "Press <b>Spacebar</b> to initiate object detection.\n";
+                        instructionText.text =
+                            "Press <b>Spacebar</b> to initiate object detection.\n";
                     }
                     else
                     {
                         currentState = AppState.Initialization;
                         objectInitializer.Initialize();
-                        objectInitializer.InitializeNamedObject(simulation.objectsToInitialize[0].Item1, simulation.objectsToInitialize[0].Item2, simulation.objectsToInitialize[0].Item3);
-                        instructionText.text = $"Place the <b>{simulation.objectsToInitialize[0].Item1}</b> object in the center of the canvas.\n\n" +
-                                               "Press <b>Spacebar</b> to initiate object detection.\n";
+                        objectInitializer.InitializeNamedObject(
+                            simulation.objectsToInitialize[0].Item1,
+                            simulation.objectsToInitialize[0].Item2,
+                            simulation.objectsToInitialize[0].Item3
+                        );
+                        instructionText.text =
+                            $"Place the <b>{simulation.objectsToInitialize[0].Item1}</b> object in the center of the canvas.\n\n"
+                            + "Press <b>Spacebar</b> to initiate object detection.\n";
                     }
                 }
                 break;
@@ -106,37 +122,45 @@ public class ApplicationFlowManager : MonoBehaviour
                     {
                         firstInitialization = false;
                         StartCoroutine(objectInitializer.DelayedIntialize());
-                        instructionText.text = "To change the color of the object, go to ApplicationManager > Object Initializer > Object Color.\n\n" +
-                                               "Press <b>Spacebar</b> to reinitialize.\n" +
-                                               "Press <b>Enter</b> to save the object and continue.";
+                        instructionText.text =
+                            "To change the color of the object, go to ApplicationManager > Object Initializer > Object Color.\n\n"
+                            + "Press <b>Spacebar</b> to reinitialize.\n"
+                            + "Press <b>Enter</b> to save the object and continue.";
                     }
                     else
                     {
                         objectInitializer.Reinitialize();
                     }
                 }
-                if (Input.GetKeyDown(KeyCode.Return) && objectInitializer.currentVisualizedObject != null)
+                if (
+                    Input.GetKeyDown(KeyCode.Return)
+                    && objectInitializer.currentVisualizedObject != null
+                )
                 {
                     objectsToInitializeIndex++;
                     if (objectInitializer.currentVisualizedObject != null)
                     {
-
                         objectInitializer.SaveObjectToList();
                         Destroy(objectInitializer.currentVisualizedObject);
                     }
 
                     if (simulation.objectsToInitialize.Count - 1 >= objectsToInitializeIndex)
                     {
-                        objectInitializer.InitializeNamedObject(simulation.objectsToInitialize[objectsToInitializeIndex].Item1, simulation.objectsToInitialize[objectsToInitializeIndex].Item2, simulation.objectsToInitialize[objectsToInitializeIndex].Item3);
-                        instructionText.text = $"Place the <b>{simulation.objectsToInitialize[objectsToInitializeIndex].Item1}</b> object in the center of the canvas.\n\n" +
-                       "Press <b>Spacebar</b> to reinitialize.\n" +
-                       "Press <b>Enter</b> to save the object and continue.";
+                        objectInitializer.InitializeNamedObject(
+                            simulation.objectsToInitialize[objectsToInitializeIndex].Item1,
+                            simulation.objectsToInitialize[objectsToInitializeIndex].Item2,
+                            simulation.objectsToInitialize[objectsToInitializeIndex].Item3
+                        );
+                        instructionText.text =
+                            $"Place the <b>{simulation.objectsToInitialize[objectsToInitializeIndex].Item1}</b> object in the center of the canvas.\n\n"
+                            + "Press <b>Spacebar</b> to reinitialize.\n"
+                            + "Press <b>Enter</b> to save the object and continue.";
                     }
-                    // fullImage.texture = null; 
                     else
                     {
                         currentState = AppState.Simulation;
-                        instructionText.text = "Press <b>Spacebar</b> to initiate object detection.";
+                        instructionText.text =
+                            "Press <b>Spacebar</b> to initiate object detection.";
                     }
                 }
                 break;
@@ -150,9 +174,7 @@ public class ApplicationFlowManager : MonoBehaviour
                     objectDetector.StartDetecting();
                 }
                 if (Input.GetKeyDown(KeyCode.Return))
-                {
                     objectDetector.StopDetecting();
-                }
                 break;
         }
     }

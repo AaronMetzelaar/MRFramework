@@ -8,16 +8,33 @@ using UnityEngine;
 [Serializable]
 public class InitializedObject
 {
-    // Hue of the object with white projected on it
+    /// <summary>
+    /// Hue of the object with white projected on it.
+    /// </summary>
     public float WhiteHue;
-    // Hue of the object with the Color projected on it
+
+    /// <summary>
+    /// Hue of the object with the Color projected on it.
+    /// </summary>
     public float ColorHue;
-    // Color to project on the object
+
+    /// <summary>
+    /// Color to project on the object.
+    /// </summary>
     public Color Color;
-    // Contour of the object
+
+    /// <summary>
+    /// Contour of the object.
+    /// </summary>
     public Point[] Contour;
-    // Name of the object, defaults to "Object"
+
+    /// <summary>
+    /// Name of the object, defaults to "Object".
+    /// </summary>
     public string Name = "Object";
-    // Whether to check for the color of the object
+
+    /// <summary>
+    /// Whether to check for the color of the object.
+    /// </summary>
     public bool CheckColor = true;
 }

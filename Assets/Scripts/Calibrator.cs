@@ -1,12 +1,12 @@
-using UnityEngine;
-using OpenCvSharp;
-using UnityEngine.UI;
-using System.Linq;
-using System.Collections;
 using System;
-using TMPro;
+using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
+using OpenCvSharp;
+using TMPro;
+using UnityEngine;
+using UnityEngine.UI;
 
 /// <summary>
 /// The Calibrator class is responsible for calibrating the camera and detecting corners in the camera feed.
@@ -16,18 +16,32 @@ public class Calibrator : MonoBehaviour
 {
     public static Calibrator Instance { get; private set; }
     public CalibratorData CurrentCalibratorData { get; private set; }
+
     // Used to show the camera feed with the detected rectangle
     public RawImage canvasPreviewImage;
+
     // The camera texture
-    [NonSerialized] public WebCamTexture webcamTexture;
-    // Public property for the camera rotation
-    [SerializeField] private CameraRotationOption cameraRotation;
-    [SerializeField] public Image calibrationImageContainer;
-    [SerializeField] public TextMeshProUGUI instructionText;
-    [SerializeField] public Sprite calibrationImage;
+    [NonSerialized]
+    public WebCamTexture webcamTexture;
+
+    [SerializeField]
+    private CameraRotationOption cameraRotation;
+
+    [SerializeField]
+    public Image calibrationImageContainer;
+
+    [SerializeField]
+    public TextMeshProUGUI instructionText;
+
+    [SerializeField]
+    public Sprite calibrationImage;
+
     // Boolean to check if the camera is flipped
-    [NonSerialized] private bool isFlipped = false;
-    [NonSerialized] public bool isCalibrating = true;
+    [NonSerialized]
+    private bool isFlipped = false;
+
+    [NonSerialized]
+    public bool isCalibrating = true;
     private Mat cameraMatrix;
     private Mat distortionCoefficients;
     private Mat transformationMatrix;
@@ -43,10 +57,7 @@ public class Calibrator : MonoBehaviour
 
     public CameraRotationOption CameraRotation
     {
-        get
-        {
-            return cameraRotation;
-        }
+        get { return cameraRotation; }
         set
         {
             cameraRotation = value;
@@ -80,6 +91,7 @@ public class Calibrator : MonoBehaviour
         RunDetection();
 
         calibrationImageContainer.gameObject.SetActive(false);
+        instructionText.gameObject.SetActive(true);
     }
 
     /// <summary>
@@ -89,23 +101,19 @@ public class Calibrator : MonoBehaviour
     public IEnumerator Recalibrate()
     {
         if (canvasPreviewImage != null)
-        {
             canvasPreviewImage.gameObject.SetActive(false);
-        }
 
         cameraMatrix = null;
         distortionCoefficients = null;
         calibrationImageContainer.gameObject.SetActive(true);
         instructionText.gameObject.SetActive(false);
+
         // Give the camera some time to take a picture
         yield return new WaitForSeconds(0.2f);
+
         RunDetection();
         calibrationImageContainer.gameObject.SetActive(false);
         instructionText.gameObject.SetActive(true);
-        instructionText.text = "Rectangle set.\n\n" +
-                                "Press <b>Spacebar</b> to recalibrate the rectangle.\n" +
-                                "Press <b>B</b> to set a new base image based on the current found rectangle.\n" +
-                               "Press <b>Enter</b> to continue.";
     }
 
     /// <summary>
@@ -122,19 +130,27 @@ public class Calibrator : MonoBehaviour
 
             if (corners == null)
             {
-                instructionText.text = "No rectangle found.\n\n" +
-                                       "Make sure the entire playing field is visible.\n" +
-                                       "Also, make sure there is enough contrast between the playing field\n" +
-                                       "and the surface underneath.\n\n" +
-                                       "Press <b>Spacebar</b> to recalibrate.";
+                instructionText.text =
+                    "No rectangle found.\n\n"
+                    + "Make sure the entire playing field is visible.\n"
+                    + "Also, make sure there is enough contrast between the playing field\n"
+                    + "and the surface underneath.\n\n"
+                    + "Press <b>Spacebar</b> to recalibrate.";
                 return;
             }
 
             transformationMatrix = GetTransformationMatrix(corners);
             Mat croppedImage = CropImage(image, corners);
-            ChequerboardCalibration(croppedImage);
+            Mat undistortedImage = ChequerboardCalibration(croppedImage);
 
-            Point[] undistortedCorners = UndistortPoints(corners, cameraMatrix, distortionCoefficients);
+            if (undistortedImage == null)
+                return;
+
+            Point[] undistortedCorners = UndistortPoints(
+                corners,
+                cameraMatrix,
+                distortionCoefficients
+            );
 
             Mat baseImage = await GetBaseImageAsync();
 
@@ -143,7 +159,14 @@ public class Calibrator : MonoBehaviour
             canvasPreviewImage = RotateRawImage(canvasPreviewImage, cameraRotation);
 
             // Save the calibration data
-            CurrentCalibratorData = new CalibratorData(undistortedCorners, transformationMatrix, cameraMatrix, distortionCoefficients, baseImage, cameraRotation);
+            CurrentCalibratorData = new CalibratorData(
+                undistortedCorners,
+                transformationMatrix,
+                cameraMatrix,
+                distortionCoefficients,
+                baseImage,
+                cameraRotation
+            );
         }
     }
 
@@ -163,14 +186,14 @@ public class Calibrator : MonoBehaviour
 
         CurrentCalibratorData.BaseImage = baseImage;
         canvasPreviewImage.gameObject.SetActive(true);
-        Mat rotatedBaseImage = new();
 
         canvasPreviewImage.texture = OpenCvSharp.Unity.MatToTexture(baseImage);
         instructionText.gameObject.SetActive(true);
-        instructionText.text = "Base image set.\n\n" +
-                                "Press <b>Spacebar</b> to recalibrate the rectangle.\n" +
-                                "Press <b>B</b> to set a new base image based on the current found rectangle.\n" +
-                               "Press <b>Enter</b> to continue.";
+        instructionText.text =
+            "Base image set.\n\n"
+            + "Press <b>Spacebar</b> to recalibrate the rectangle.\n"
+            + "Press <b>B</b> to set a new base image based on the current found rectangle.\n"
+            + "Press <b>Enter</b> to continue.";
     }
 
     /// <summary>
@@ -187,7 +210,9 @@ public class Calibrator : MonoBehaviour
 
         if (transformationMatrix == null || cameraMatrix == null || distortionCoefficients == null)
         {
-            Debug.LogError("Transformation matrix, camera matrix, or distortion coefficients not found.");
+            Debug.LogError(
+                "Transformation matrix, camera matrix, or distortion coefficients not found."
+            );
             return null;
         }
 
@@ -196,11 +221,15 @@ public class Calibrator : MonoBehaviour
         await Task.Delay(500);
 
         Mat image = OpenCvSharp.Unity.TextureToMat(webcamTexture);
-        Mat baseImage = GetUndistortedCroppedImage(image, transformationMatrix, cameraMatrix, distortionCoefficients);
+        Mat baseImage = GetUndistortedCroppedImage(
+            image,
+            transformationMatrix,
+            cameraMatrix,
+            distortionCoefficients
+        );
 
         return baseImage;
     }
-
 
     /// <summary>
     /// Detects the corners of a projected rectangle in an image.
@@ -227,7 +256,13 @@ public class Calibrator : MonoBehaviour
             Cv2.Threshold(grayImage, thresholdImage, i, i + step, ThresholdTypes.Binary);
             Cv2.CvtColor(thresholdImage, contoursImage, ColorConversionCodes.GRAY2BGR);
 
-            Cv2.FindContours(thresholdImage, out Point[][] contours, out HierarchyIndex[] hierarchyIndexes, RetrievalModes.External, ContourApproximationModes.ApproxSimple);
+            Cv2.FindContours(
+                thresholdImage,
+                out Point[][] contours,
+                out HierarchyIndex[] hierarchyIndexes,
+                RetrievalModes.External,
+                ContourApproximationModes.ApproxSimple
+            );
 
             double maxArea = 0;
             int maxAreaIndex = -1;
@@ -244,12 +279,19 @@ public class Calibrator : MonoBehaviour
 
             if (maxAreaIndex != -1)
             {
-                Point[] polyApprox = Cv2.ApproxPolyDP(contours[maxAreaIndex], Cv2.ArcLength(contours[maxAreaIndex], true) * 0.02, true);
+                Point[] polyApprox = Cv2.ApproxPolyDP(
+                    contours[maxAreaIndex],
+                    Cv2.ArcLength(contours[maxAreaIndex], true) * 0.02,
+                    true
+                );
 
                 if (polyApprox.Length == 4)
                 {
                     // If the size of the rectangle is smaller than 100 pixels, it's probably just noise
-                    if (!(Cv2.ContourArea(polyApprox) < 100) && IsContourWithinImage(polyApprox, image))
+                    if (
+                        !(Cv2.ContourArea(polyApprox) < 100)
+                        && IsContourWithinImage(polyApprox, image)
+                    )
                     {
                         rectangleCorners = polyApprox;
                         foundRectangle = true;
@@ -259,9 +301,7 @@ public class Calibrator : MonoBehaviour
             }
 
             if (foundRectangle)
-            {
                 break;
-            }
         }
 
         if (foundRectangle)
@@ -270,9 +310,7 @@ public class Calibrator : MonoBehaviour
             Texture2D textureWithRectangle = OpenCvSharp.Unity.MatToTexture(image);
 
             if (canvasPreviewImage != null)
-            {
                 canvasPreviewImage.texture = textureWithRectangle;
-            }
         }
         else
         {
@@ -284,6 +322,13 @@ public class Calibrator : MonoBehaviour
 
         if (rectangleCorners.Length == 4)
         {
+            instructionText.text =
+                "If the border is incorrect, make sure the entire playing field is visible.\n"
+                + "Also, make sure there is enough contrast between the playing field\n"
+                + "and the surface underneath.\n\n"
+                + "Press <b>Spacebar</b> to recalibrate.\n"
+                + "Press <b>B</b> to set a base image based on the current found rectangle.\n"
+                + "Press <b>Enter</b> to continue.";
             return rectangleCorners;
         }
 
@@ -298,8 +343,12 @@ public class Calibrator : MonoBehaviour
     public Mat ChequerboardCalibration(Mat image)
     {
         Size patternSize = new(9, 6);
-        Cv2.FindChessboardCorners(image, patternSize, out Point2f[] corners,
-                                  ChessboardFlags.AdaptiveThresh | ChessboardFlags.NormalizeImage);
+        Cv2.FindChessboardCorners(
+            image,
+            patternSize,
+            out Point2f[] corners,
+            ChessboardFlags.AdaptiveThresh | ChessboardFlags.NormalizeImage
+        );
 
         if (corners.Length == 54)
         {
@@ -307,40 +356,63 @@ public class Calibrator : MonoBehaviour
             Cv2.CvtColor(image, grayImage, ColorConversionCodes.BGRA2GRAY);
 
             // Refine corner locations (needs grayscale image)
-            Cv2.CornerSubPix(grayImage, corners, new Size(11, 11), new Size(-1, -1),
-                             new TermCriteria(CriteriaType.Eps | CriteriaType.MaxIter, 30, 0.1));
+            Cv2.CornerSubPix(
+                grayImage,
+                corners,
+                new Size(11, 11),
+                new Size(-1, -1),
+                new TermCriteria(CriteriaType.Eps | CriteriaType.MaxIter, 30, 0.1)
+            );
 
             List<Point3f> objectPoints = new();
             for (int i = 0; i < patternSize.Height; i++)
-                for (int j = 0; j < patternSize.Width; j++)
-                    objectPoints.Add(new Point3f(j, i, 0.0f));
+            for (int j = 0; j < patternSize.Width; j++)
+                objectPoints.Add(new Point3f(j, i, 0.0f));
 
             List<Point3f[]> objPoints = new() { objectPoints.ToArray() };
             List<Point2f[]> imgPoints = new() { corners };
-            List<Mat> objPointsMat = objPoints.Select(p => new Mat(p.Length, 1, MatType.CV_32FC3, p)).ToList();
-            List<Mat> imgPointsMat = imgPoints.Select(p => new Mat(p.Length, 1, MatType.CV_32FC2, p)).ToList();
+            List<Mat> objPointsMat = objPoints
+                .Select(p => new Mat(p.Length, 1, MatType.CV_32FC3, p))
+                .ToList();
+            List<Mat> imgPointsMat = imgPoints
+                .Select(p => new Mat(p.Length, 1, MatType.CV_32FC2, p))
+                .ToList();
 
             Mat camMatrix = new();
             Mat distCoeffs = new();
-            Cv2.CalibrateCamera(objPointsMat, imgPointsMat, image.Size(), camMatrix, distCoeffs,
-                                out _, out _);
+            Cv2.CalibrateCamera(
+                objPointsMat,
+                imgPointsMat,
+                image.Size(),
+                camMatrix,
+                distCoeffs,
+                out _,
+                out _
+            );
 
             // Save to calibrator data
             cameraMatrix = camMatrix;
             distortionCoefficients = distCoeffs;
 
             // To see the undistorted image, uncomment the following lines
-            // Mat undistortedImage = new();
-            // Cv2.Undistort(image, undistortedImage, camMatrix, distCoeffs);
+            Mat undistortedImage = new();
+            Cv2.Undistort(image, undistortedImage, camMatrix, distCoeffs);
+
+            return undistortedImage;
             // canvasPreviewImage.texture = OpenCvSharp.Unity.MatToTexture(undistortedImage);
         }
         else
         {
+            instructionText.gameObject.SetActive(true);
+            instructionText.text =
+                "Chessboard corners not found.\n\n"
+                + "Make sure the entire playing field is visible.\n"
+                + "Also, make sure there is enough contrast between the playing field\n"
+                + "and the surface underneath.\n\n"
+                + "Press <b>Spacebar</b> to recalibrate.";
             Debug.LogError("Chessboard corners not found.");
             return null;
         }
-
-        return image;
     }
 
     /// <summary>
@@ -352,9 +424,11 @@ public class Calibrator : MonoBehaviour
     public bool IsContourWithinImage(Point[] rectangleCorners, Mat image)
     {
         OpenCvSharp.Rect boundingRect = Cv2.BoundingRect(rectangleCorners);
-        bool isInsideImage = boundingRect.X > 1 && boundingRect.Y > 1 &&
-                             boundingRect.X + boundingRect.Width < image.Width - 1 &&
-                             boundingRect.Y + boundingRect.Height < image.Height - 1;
+        bool isInsideImage =
+            boundingRect.X > 1
+            && boundingRect.Y > 1
+            && boundingRect.X + boundingRect.Width < image.Width - 1
+            && boundingRect.Y + boundingRect.Height < image.Height - 1;
 
         return isInsideImage;
     }
@@ -373,7 +447,11 @@ public class Calibrator : MonoBehaviour
         Graphics.Blit(texture, renderTexture);
 
         RenderTexture.active = renderTexture;
-        texture2D.ReadPixels(new UnityEngine.Rect(0, 0, renderTexture.width, renderTexture.height), 0, 0);
+        texture2D.ReadPixels(
+            new UnityEngine.Rect(0, 0, renderTexture.width, renderTexture.height),
+            0,
+            0
+        );
         texture2D.Apply();
 
         RenderTexture.active = currentRT;
@@ -405,7 +483,6 @@ public class Calibrator : MonoBehaviour
             rawImage.rectTransform.Rotate(0, 0, 180);
             isFlipped = true;
         }
-
         else if (rotation == CameraRotationOption.None && isFlipped)
         {
             rawImage.rectTransform.Rotate(0, 0, 180);
@@ -445,7 +522,10 @@ public class Calibrator : MonoBehaviour
         for (int i = 0; i < points.Length; i++)
         {
             Point2f undistortedPoints2f = undistortedPointsMat.At<Point2f>(i);
-            undistortedPoints[i] = new Point((int)undistortedPoints2f.X, (int)undistortedPoints2f.Y);
+            undistortedPoints[i] = new Point(
+                (int)undistortedPoints2f.X,
+                (int)undistortedPoints2f.Y
+            );
         }
 
         return undistortedPoints;
@@ -458,49 +538,53 @@ public class Calibrator : MonoBehaviour
     /// <returns>The transformation matrix.</returns>
     public Mat GetTransformationMatrix(Point[] corners)
     {
-        // float aspectRatio = (float)(corners[1].X - corners[0].X) / (corners[2].Y - corners[0].Y);
-
         // Source points as seen by the camera
-        Point2f[] sourcePoints = OrderCorners(corners.Select(corner => new Point2f(corner.X, corner.Y)).ToArray());
+        Point2f[] sourcePoints = OrderCorners(
+            corners.Select(corner => new Point2f(corner.X, corner.Y)).ToArray()
+        );
 
         // The corner points of the camera feed
         Point2f[] destinationPoints = new Point2f[4];
 
         if (cameraRotation == CameraRotationOption.None)
         {
-            destinationPoints = new Point2f[] {
-                    new(0, 0),                          // Top left
-                    new(Screen.width, 0),               // Top right
-                    new(Screen.width, Screen.height),   // Bottom right
-                    new(0, Screen.height),              // Bottom left
-                };
+            destinationPoints = new Point2f[]
+            {
+                new(0, 0), // Top left
+                new(Screen.width, 0), // Top right
+                new(Screen.width, Screen.height), // Bottom right
+                new(0, Screen.height), // Bottom left
+            };
         }
         else if (cameraRotation == CameraRotationOption.MirroredBoth)
         {
-            destinationPoints = new Point2f[] {
-                    new(Screen.width, Screen.height),
-                    new(0, Screen.height),
-                    new(0, 0),
-                    new(Screen.width, 0),
-                };
+            destinationPoints = new Point2f[]
+            {
+                new(Screen.width, Screen.height),
+                new(0, Screen.height),
+                new(0, 0),
+                new(Screen.width, 0),
+            };
         }
         else if (cameraRotation == CameraRotationOption.MirroredHorizontally)
         {
-            destinationPoints = new Point2f[] {
-                    new(0, Screen.height),
-                    new(Screen.width, Screen.height),
-                    new(Screen.width, 0),
-                    new(0, 0),
-                };
+            destinationPoints = new Point2f[]
+            {
+                new(0, Screen.height),
+                new(Screen.width, Screen.height),
+                new(Screen.width, 0),
+                new(0, 0),
+            };
         }
         else if (cameraRotation == CameraRotationOption.MirroredVertically)
         {
-            destinationPoints = new Point2f[] {
-                    new(Screen.width, 0),
-                    new(0, 0),
-                    new(0, Screen.height),
-                    new(Screen.width, Screen.height),
-                };
+            destinationPoints = new Point2f[]
+            {
+                new(Screen.width, 0),
+                new(0, 0),
+                new(0, Screen.height),
+                new(Screen.width, Screen.height),
+            };
         }
         Mat transformationMatrix = Cv2.GetPerspectiveTransform(sourcePoints, destinationPoints);
 
@@ -516,7 +600,12 @@ public class Calibrator : MonoBehaviour
     public Mat CropImage(Mat image, Point[] corners)
     {
         Mat transformedImage = new();
-        Cv2.WarpPerspective(image, transformedImage, GetTransformationMatrix(corners), new Size(Screen.width, Screen.height));
+        Cv2.WarpPerspective(
+            image,
+            transformedImage,
+            GetTransformationMatrix(corners),
+            new Size(Screen.width, Screen.height)
+        );
 
         return transformedImage;
     }
@@ -529,7 +618,12 @@ public class Calibrator : MonoBehaviour
     /// <param name="cameraMatrix">The camera matrix.</param>
     /// <param name="distortionCoefficients">The distortion coefficients.</param>
     /// <returns>The undistorted and cropped image.</returns>
-    public Mat GetUndistortedCroppedImage(Mat image, Mat transformationMatrix, Mat cameraMatrix, Mat distortionCoefficients)
+    public Mat GetUndistortedCroppedImage(
+        Mat image,
+        Mat transformationMatrix,
+        Mat cameraMatrix,
+        Mat distortionCoefficients
+    )
     {
         if (cameraMatrix == null || distortionCoefficients == null)
         {
@@ -541,7 +635,12 @@ public class Calibrator : MonoBehaviour
         Cv2.Undistort(image, undistortedImage, cameraMatrix, distortionCoefficients);
 
         Mat croppedImage = new();
-        Cv2.WarpPerspective(undistortedImage, croppedImage, transformationMatrix, new Size(Screen.width, Screen.height));
+        Cv2.WarpPerspective(
+            undistortedImage,
+            croppedImage,
+            transformationMatrix,
+            new Size(Screen.width, Screen.height)
+        );
 
         return croppedImage;
     }
@@ -556,11 +655,19 @@ public class Calibrator : MonoBehaviour
         Point center = new(corners.Average(point => point.X), corners.Average(point => point.Y));
 
         // Order of points: top left, bottom left, bottom right, top right
-        Point2f[] orderedCorners = corners.OrderBy(point => Math.Atan2(point.Y - center.Y, point.X - center.X)).ToArray();
+        Point2f[] orderedCorners = corners
+            .OrderBy(point => Math.Atan2(point.Y - center.Y, point.X - center.X))
+            .ToArray();
 
         if (orderedCorners[0].X > orderedCorners[2].X || orderedCorners[0].Y > orderedCorners[2].Y)
         {
-            return new Point2f[] { orderedCorners[1], orderedCorners[0], orderedCorners[3], orderedCorners[2] };
+            return new Point2f[]
+            {
+                orderedCorners[1],
+                orderedCorners[0],
+                orderedCorners[3],
+                orderedCorners[2]
+            };
         }
 
         return orderedCorners;
