@@ -4,11 +4,11 @@ using UnityEngine;
 
 /// <summary>
 /// This file is used as an example of how the framework can be used.
-/// It represents a simulation for an RGB color mixing demo.
+/// It represents an application for an RGB color mixing demo.
 /// This class handles the detection and manipulation of objects with different colors,
 /// and updates the color display object based on the rotation of the detected objects.
 /// </summary>
-public class RGBDemoSimulation : MonoBehaviour
+public class RGBDemoApplication : MonoBehaviour
 {
     [NonSerialized]
     private ObjectDetector objectDetector;

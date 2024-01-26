@@ -9,7 +9,7 @@ public class ApplicationFlowManager : MonoBehaviour
     {
         Calibration,
         Initialization,
-        Simulation
+        Application
     }
 
     [NonSerialized]
@@ -22,10 +22,10 @@ public class ApplicationFlowManager : MonoBehaviour
     private ObjectDetector objectDetector;
 
     [Tooltip(
-        "The simulation file to load. This file should have a list of objects to be initialized."
+        "The application file to load. This file should have a list of objects to be initialized."
     )]
     [NonSerialized]
-    private RGBDemoSimulation simulation;
+    private RGBDemoApplication simulation;
 
     [SerializeField]
     private ObjectData objectData;
@@ -96,7 +96,7 @@ public class ApplicationFlowManager : MonoBehaviour
 
                     if (saveObjectData && objectData.objectDataList.Count > 0)
                     {
-                        currentState = AppState.Simulation;
+                        currentState = AppState.Application;
                         instructionText.text =
                             "Press <b>Spacebar</b> to initiate object detection.\n";
                     }
@@ -158,13 +158,13 @@ public class ApplicationFlowManager : MonoBehaviour
                     }
                     else
                     {
-                        currentState = AppState.Simulation;
+                        currentState = AppState.Application;
                         instructionText.text =
                             "Press <b>Spacebar</b> to initiate object detection.";
                     }
                 }
                 break;
-            case AppState.Simulation:
+            case AppState.Application:
                 if (Input.GetKeyDown(KeyCode.Space))
                 {
                     objectDetector.webCamTexture = calibrator.webcamTexture;
