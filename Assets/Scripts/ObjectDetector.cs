@@ -53,7 +53,8 @@ public class ObjectDetector : MonoBehaviour
     [Range(0.0f, 1.0f)]
     public float hueMargin = 0.2f;
 
-    private bool isDetecting = false;
+    [NonSerialized]
+    public bool isDetecting = false;
     private InitializedObject[] initializedObjects;
     private Dictionary<DetectedValues, GameObject> activeObjects;
     private HashSet<DetectedValues> currentObjectIds;

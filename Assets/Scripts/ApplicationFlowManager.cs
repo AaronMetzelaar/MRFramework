@@ -165,7 +165,7 @@ public class ApplicationFlowManager : MonoBehaviour
                 }
                 break;
             case AppState.Application:
-                if (Input.GetKeyDown(KeyCode.Space))
+                if (Input.GetKeyDown(KeyCode.Space) && !objectDetector.isDetecting)
                 {
                     objectDetector.webCamTexture = calibrator.webcamTexture;
                     instructionText.text = null;
@@ -173,8 +173,6 @@ public class ApplicationFlowManager : MonoBehaviour
                     simulation.Initialize();
                     objectDetector.StartDetecting();
                 }
-                if (Input.GetKeyDown(KeyCode.Return))
-                    objectDetector.StopDetecting();
                 break;
         }
     }
