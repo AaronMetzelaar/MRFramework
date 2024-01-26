@@ -130,6 +130,8 @@ public class Calibrator : MonoBehaviour
 
             if (corners == null)
             {
+                canvasPreviewImage.gameObject.SetActive(true);
+                canvasPreviewImage.texture = webcamTexture;
                 instructionText.text =
                     "No rectangle found.\n\n"
                     + "Make sure the entire playing field is visible.\n"
@@ -403,6 +405,8 @@ public class Calibrator : MonoBehaviour
         }
         else
         {
+            canvasPreviewImage.gameObject.SetActive(true);
+            canvasPreviewImage.texture = OpenCvSharp.Unity.MatToTexture(image);
             instructionText.gameObject.SetActive(true);
             instructionText.text =
                 "Chessboard corners not found.\n\n"
