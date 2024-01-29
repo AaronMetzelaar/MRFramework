@@ -10,6 +10,9 @@ The framework contains multiple steps to create the MR simulation: calibration, 
 - [OpenCV plus Unity package](https://assetstore.unity.com/packages/tools/integration/opencv-plus-unity-85928)
 - [Chequerboard calibration image](https://github.com/opencv/opencv/blob/3.4/doc/pattern.png)
 
+## Example video
+https://youtu.be/rx8KwephDO0?si=HU_tgy5QHcYv1XS_
+
 ## License
 This project is licensed under the MIT License - see the `LICENSE` file for details.
 
