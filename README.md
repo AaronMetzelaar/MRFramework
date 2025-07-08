@@ -3,7 +3,7 @@
 ## Introduction
 This framework enables the development of interactive simulations in Mixed Reality (MR) environments using projection systems and physical object detection. It integrates projection technology with camera systems for real-time interaction with tangible objects.
 
-The framework contains multiple steps to create the MR simulation: calibration, initialization and detection. These steps are also separated in the source files. A demo simulation using the framework can be found [here](https://github.com/AaronMetzelaar/MRTemplate/blob/main/Assets/Scripts/RGBDemoSimulation.cs).
+The framework contains multiple steps to create the MR simulation: calibration, initialization and detection. These steps are also separated in the source files. A demo simulation using the framework can be found [here](https://github.com/AaronMetzelaar/MRFramework/blob/main/Assets/Scripts/RGBDemoApplication.cs).
 
 ## Requirements
 - Unity version 2022.3.16f1 (latest LTS version as of writing)
